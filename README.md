@@ -49,21 +49,21 @@ Game (state machine stack)
 ### Goal: Render tiles on a canvas, move a camera around
 
 #### 1.1 Core Engine Shell
-- [ ] **State machine** — Stack-based `GameState` class with `init()`, `think()`, `draw()`, `handleInput()`, `blit()`. States: `pushState()`, `popState()`, `setState()`. Replicates OpenXcom's `State` class pattern.
-- [ ] **Game loop** — `requestAnimationFrame` loop with fixed-timestep update (60fps)
-- [ ] **Input system** — Keyboard, mouse, click handling mapped to actions. Mousewheel zoom.
-- [ ] **Timer system** — Replicate OpenXcom's `Timer` class: countdown-based callbacks, separate from frame loop
+- [ ] **State machine** — Stack-based `GameState` class. Replicates the pattern in OpenXcom's [`src/Engine/Game.h`](https://github.com/OpenXcom/OpenXcom/blob/master/src/Engine/Game.h) (state stack: `setState`, `pushState`, `popState`). Each state has `init()`, `think()`, `draw()`, `handle()`, `blit()`.
+- [ ] **Game loop** — `requestAnimationFrame` with fixed-timestep update at 60fps. Mirrors `Game::run()` in the same file.
+- [ ] **Input system** — Keyboard, mouse, click handling mapped to actions. Mousewheel zoom. Modeled after OpenXcom's `Action` class and `Screen::handle()` in [`src/Engine/Screen.h`](https://github.com/OpenXcom/OpenXcom/blob/master/src/Engine/Screen.h).
+- [ ] **Timer system** — Countdown-based callbacks, separate from frame loop. Replicate OpenXcom's `Timer` class (see usage in [`src/Geoscape/GeoscapeState.h`](https://github.com/OpenXcom/OpenXcom/blob/master/src/Geoscape/GeoscapeState.h) — `_gameTimer`, `_zoomInEffectTimer`, etc.).
 
 #### 1.2 Isometric Renderer
-- [ ] **Isometric projection math** — Convert 3D tile coords (x,y,z) to 2D screen coords. OpenXcom's tile is 32x40 pixels (width x height/2), staggered grid.
-- [ ] **Layer system** — Draw order: floor → west wall → north wall → object. Each tile has 4 drawable parts (`O_FLOOR`, `O_WESTWALL`, `O_NORTHWALL`, `O_OBJECT`).
-- [ ] **Camera** — `Camera` class matching OpenXcom: pan (arrow keys/mouse edge scroll), zoom (integer levels), `getVisibleMapHeight()`
-- [ ] **Sprite atlas system** — Load sprite sheets from PNG strips (OpenXcom uses 256-color indexed PNGs per `SurfaceSet`). Each frame is a fixed-size sprite. Support animation frames (tile anims cycle 0-7).
+- [ ] **Isometric projection math** — Convert 3D tile coords (x,y,z) to 2D screen coords. OpenXcom's tile is 32x40 pixels (width x height/2), staggered grid. See [`src/Battlescape/Map.h`](https://github.com/OpenXcom/OpenXcom/blob/master/src/Battlescape/Map.h) — specifically `getIconWidth()`/`getIconHeight()`, `drawTerrain()`, `drawUnit()`.
+- [ ] **Layer system** — Draw order: floor → west wall → north wall → object. Each tile has 4 drawable parts (`O_FLOOR`, `O_WESTWALL`, `O_NORTHWALL`, `O_OBJECT`) defined in [`src/Mod/MapData.h`](https://github.com/OpenXcom/OpenXcom/blob/master/src/Mod/MapData.h) (the `TilePart` enum).
+- [ ] **Camera** — Pan (arrow keys/mouse edge scroll), zoom (integer levels). Port of [`src/Battlescape/Camera.h`](https://github.com/OpenXcom/OpenXcom/blob/master/src/Battlescape/Camera.h).
+- [ ] **Sprite atlas system** — Load sprite sheets from PNG strips. OpenXcom uses 256-color indexed PNGs per `SurfaceSet` (see `MapDataSet` in the mod system). Each frame is a fixed-size sprite. Support animation frames (tile anims cycle 0-7 — see `Map::animate()` in the battlescape).
 
 #### 1.3 Data Structures
-- [ ] **Tile class** — One tile = 12 quadrants of voxel data, 4 drawable parts. Each part has: sprite ID, terrain level, blockage values (HE/vision/smoke/fire/gas), TU costs (walk/fly/slide), flags (door, UFO door, grav lift, no-floor, big wall, stop LOS). Replicate `MapData` from OpenXcom.
-- [ ] **Position class** — `{x, y, z}`. Direction constants (0-7 for 8 compass points + UP=8 + DOWN=9). `directionToVector()` and `vectorToDirection()`.
-- [ ] **Voxel system** — Integer grid of voxel types (`V_EMPTY`, `V_FLOOR`, `V_WESTWALL`, `V_NORTHWALL`, `V_OBJECT`, `V_UNIT`, `V_OUTOFBOUNDS`). 16 sub-units per tile per Z. Used for LOS, explosions, projectile physics.
+- [ ] **Tile class** — One tile = 12 quadrants of voxel data, 4 drawable parts. Each part has: sprite ID, terrain level, blockage values (HE/vision/smoke/fire/gas), TU costs (walk/fly/slide), flags (door, UFO door, grav lift, no-floor, big wall, stop LOS). Direct port of [`src/Mod/MapData.h`](https://github.com/OpenXcom/OpenXcom/blob/master/src/Mod/MapData.h).
+- [ ] **Position class** — `{x, y, z}`. Direction constants (0-7 for 8 compass points + UP=8 + DOWN=9). `directionToVector()` and `vectorToDirection()` — see [`src/Battlescape/Position.h`](https://github.com/OpenXcom/OpenXcom/blob/master/src/Battlescape/Position.h).
+- [ ] **Voxel system** — Integer grid of voxel types (`V_EMPTY`, `V_FLOOR`, `V_WESTWALL`, `V_NORTHWALL`, `V_OBJECT`, `V_UNIT`, `V_OUTOFBOUNDS`), 16 sub-units per tile per Z. Used for LOS, explosions, projectile physics. See `VoxelType` enum in [`src/Mod/MapData.h`](https://github.com/OpenXcom/OpenXcom/blob/master/src/Mod/MapData.h) and the voxel grid in [`src/Battlescape/TileEngine.h`](https://github.com/OpenXcom/OpenXcom/blob/master/src/Battlescape/TileEngine.h) (`_voxelData`, `voxelCheck()`, `isVoxelVisible()`).
 
 #### 1.4 Minimal Demo
 - [ ] Load a simple hardcoded battle map (10x10x4 tiles)
@@ -80,45 +80,45 @@ Game (state machine stack)
 ### Goal: Full turn-based combat — move, shoot, explosions, AI
 
 #### 2.1 Pathfinding
-- [ ] **A*** pathfinding matching OpenXcom's implementation. 3D grid (x,y,z), 8-directional movement on each floor level.
-- [ ] **Bresenham** line-of-sight check — straight path through voxel grid, used for ranged attacks
-- [ ] **TU cost calculation** — Each movement direction costs TUs based on terrain (walk/fly/slide costs from tile data). Covers: stairs up/down, big walls, doors.
-- [ ] **Path preview** — Green/yellow/red overlay per tile based on remaining TU cost (OpenXcom's `_previewSetting`).
+- [ ] **A*** pathfinding — 3D grid (x,y,z), 8-directional movement on each floor level. Direct port of [`src/Battlescape/Pathfinding.h`](https://github.com/OpenXcom/OpenXcom/blob/master/src/Battlescape/Pathfinding.h) (`aStarPath()`).
+- [ ] **Bresenham** line-of-sight — Straight path through voxel grid, used for ranged attacks. See `bresenhamPath()` in the same file.
+- [ ] **TU cost calculation** — Each direction costs TUs based on terrain (walk/fly/slide costs from `MapData`). Covers stairs up/down, big walls, doors. See `getTUCost()` in Pathfinding.
+- [ ] **Path preview** — Green/yellow/red overlay per tile based on remaining TU. Replicate OpenXcom's `_previewSetting` — see `previewPath()` in the same file.
 
 #### 2.2 Field of View & Lighting
-- [ ] **FOV algorithm** — Raycast from unit's sight origin voxel, checking voxel blockages. Max view distance = 20 tiles. OpenXcom uses `calculateFOV()` per-unit.
-- [ ] **Sun shading** — Time-of-day lighting from geoscape transferred to battlescape (0-15 shade levels)
-- [ ] **Personal lighting** — XCom units emit light (toggleable), affects visible tiles
-- [ ] **Fog of war** — Only render tiles that are in someone's FOV. Match OpenXcom's `MAX_DARKNESS_TO_SEE_UNITS = 9`.
+- [ ] **FOV algorithm** — Raycast from unit's sight origin voxel, checking voxel blockages. Max view distance = 20 tiles. Port of `calculateFOV()` in [`src/Battlescape/TileEngine.h`](https://github.com/OpenXcom/OpenXcom/blob/master/src/Battlescape/TileEngine.h).
+- [ ] **Sun shading** — Time-of-day lighting from geoscape applied to battlescape (0-15 shade levels). See `calculateSunShading()`.
+- [ ] **Personal lighting** — XCom units emit light (toggleable). See `togglePersonalLighting()` and `_personalLighting`.
+- [ ] **Fog of war** — Only render tiles in someone's FOV. `MAX_DARKNESS_TO_SEE_UNITS = 9` in TileEngine.
 
 #### 2.3 Combat System
-- [ ] **BattleAction struct** — Type (walk, shoot, throw, prime, use, psi...), actor, weapon, target, waypoints, TU cost. Replicate `BattleAction` from `BattlescapeGame.h`.
-- [ ] **BattleState stack** — OpenXcom uses a nested state stack for actions (walk state → projectile fly state → explosion state → result state). Each processes, pushes the next, pops when done. Replicate exactly.
-- [ ] **Projectile system** — Parabolic trajectory (for thrown) and line trajectory (for bullets). 35 projectile sprites. Voxel-based collision detection.
-- [ ] **Explosion system** — Radius damage, terrain destruction, smoke/fire spread. OpenXcom's `explode()` with power, type, maxRadius.
-- [ ] **Weapon accuracy** — Auto-shot, snap shot, aimed shot each have accuracy formula based on unit stats, kneeling, distance.
-- [ ] **Reaction fire** — When a unit moves through a spotted enemy's cone, the enemy can reaction-fire. OpenXcom's `tryReaction()` logic.
-- [ ] **Melee** — Stun rod, etc. `validMeleeRange()`, close combat.
+- [ ] **BattleAction struct** — Type (walk, shoot, throw, prime, use, psi...), actor, weapon, target, waypoints, TU cost. Direct port of [`src/Battlescape/BattlescapeGame.h`](https://github.com/OpenXcom/OpenXcom/blob/master/src/Battlescape/BattlescapeGame.h) — the `BattleAction` struct and `BattleActionType` enum.
+- [ ] **BattleState stack** — OpenXcom's nested action states: walk state → projectile fly state → explosion state → result state. Each pushes the next, pops when done. Replicate the `BattleState` pattern from the same file (`statePushFront`, `statePushBack`, `popState`).
+- [ ] **Projectile system** — Parabolic trajectory (thrown) and line trajectory (bullets). 35 projectile sprites, voxel-based collision. See [`src/Battlescape/Projectile.h`](https://github.com/OpenXcom/OpenXcom/blob/master/src/Battlescape/Projectile.h) and `ProjectileFlyBState`.
+- [ ] **Explosion system** — Radius damage, terrain destruction, smoke/fire spread. Port of `explode()` in [`src/Battlescape/TileEngine.h`](https://github.com/OpenXcom/OpenXcom/blob/master/src/Battlescape/TileEngine.h) with power, type, maxRadius. See also [`src/Battlescape/Explosion.h`](https://github.com/OpenXcom/OpenXcom/blob/master/src/Battlescape/Explosion.h).
+- [ ] **Weapon accuracy** — Auto-shot, snap shot, aimed shot. Formula based on unit stats, kneeling, distance.
+- [ ] **Reaction fire** — When a unit moves through a spotted enemy's cone, reaction-fire triggers. Port of `tryReaction()` in TileEngine.
+- [ ] **Melee** — Stun rods, close combat. See `validMeleeRange()` in TileEngine and [`src/Battlescape/MeleeAttackBState.h`](https://github.com/OpenXcom/OpenXcom/blob/master/src/Battlescape/MeleeAttackBState.h).
 
 #### 2.4 AI System
-- [ ] **AIModule class** — 5 modes: `AI_PATROL`, `AI_AMBUSH`, `AI_COMBAT`, `AI_ESCAPE`, plus psionics.
-- [ ] **Patrol** — Move between map nodes (pre-placed pathfinding waypoints in RMP files)
-- [ ] **Combat** — Find cover, flank, use grenades, target priority, weapon selection (rifle vs. melee)
-- [ ] **Escape** — Retreat when outmatched
-- [ ] **Psi AI** — Mind control, panic attacks (range-dependent)
-- [ ] **Node system** — Map nodes from `.RMP` files link into a graph. AI selects paths through nodes, not raw A* on every unit.
-- [ ] **Aggro** — Memory of known enemies, visual contact vs. known position
+- [ ] **AIModule class** — 5 modes: `AI_PATROL`, `AI_AMBUSH`, `AI_COMBAT`, `AI_ESCAPE`, plus psionics. Direct port of [`src/Battlescape/AIModule.h`](https://github.com/OpenXcom/OpenXcom/blob/master/src/Battlescape/AIModule.h) — the `AIMode` enum and `think()` method.
+- [ ] **Patrol** — Move between map nodes (pre-placed waypoints in `.RMP` files). See `setupPatrol()`.
+- [ ] **Combat** — Find cover, flank, use grenades, target priority, weapon selection (rifle vs melee). See `setupAttack()`, `findFirePoint()`, `projectileAction()`, `grenadeAction()`.
+- [ ] **Escape** — Retreat when outmatched. `setupEscape()`.
+- [ ] **Psi AI** — Mind control, panic attacks (range-dependent). `psiAction()`.
+- [ ] **Node system** — Map nodes from `.RMP` files link into a graph for AI routing. See `Node` class and `attachNodeLinks()` in [`src/Battlescape/BattlescapeGenerator.h`](https://github.com/OpenXcom/OpenXcom/blob/master/src/Battlescape/BattlescapeGenerator.h).
+- [ ] **Aggro** — Memory of known enemies, visual contact vs. known position. `_knownEnemies`, `_visibleEnemies`, `_spottingEnemies` in AIModule.
 
 #### 2.5 Inventory & Equipment
-- [ ] **Inventory grid** — Per-unit hand/back/belt/ground slots. Drag-and-drop UI.
-- [ ] **Weapon reloading** — Clip management (items hold ammo counts)
-- [ ] **Armor** — Front/side/rear armor values per unit, hit location system
-- [ ] **Item data model** — Size, weight, damage type, clip size, accuracy mods
+- [ ] **Inventory grid** — Per-unit hand/back/belt/ground slots. Drag-and-drop UI. Port of [`src/Battlescape/Inventory.h`](https://github.com/OpenXcom/OpenXcom/blob/master/src/Battlescape/Inventory.h) and `InventoryState`.
+- [ ] **Weapon reloading** — Clip management (items hold ammo counts). See `RuleItem` in [`src/Mod/RuleItem.h`](https://github.com/OpenXcom/OpenXcom/blob/master/src/Mod/RuleItem.h).
+- [ ] **Armor** — Front/side/rear armor values per unit, hit location system.
+- [ ] **Item data model** — Size, weight, damage type, clip size, accuracy mods.
 
 #### 2.6 Battle State Transitions
-- [ ] **Turn system** — Unit initiative, TU allocation, end-turn triggers
-- [ ] **Unit states** — Idle, walking, panicking, berserk, dying, kneeling, flying
-- [ ] **Morale** — Unit morale tracks kills, casualties, panic. Panicked units waste TU.
+- [ ] **Turn system** — Unit initiative, TU allocation, end-turn triggers. See `endTurn()` and `requestEndTurn()` in BattlescapeGame.
+- [ ] **Unit states** — Idle, walking, panicking, berserk, dying, kneeling, flying. State classes: [`UnitWalkBState`](https://github.com/OpenXcom/OpenXcom/blob/master/src/Battlescape/UnitWalkBState.h), [`UnitDieBState`](https://github.com/OpenXcom/OpenXcom/blob/master/src/Battlescape/UnitDieBState.h), [`UnitPanicBState`](https://github.com/OpenXcom/OpenXcom/blob/master/src/Battlescape/UnitPanicBState.h), etc.
+- [ ] **Morale** — Unit morale tracks kills, casualties, panic. Panicked units waste TU. See `handlePanickingUnit()` in BattlescapeGame.
 
 **Deliverable:** Full tactical battle — move units, shoot aliens, AI fights back, missions winnable/losable. ~4-5 weeks.
 
@@ -129,37 +129,37 @@ Game (state machine stack)
 ### Goal: World map, base building, research, manufacturing, funding
 
 #### 3.1 Globe
-- [ ] **Polar-to-cartesian projection** — OpenXcom uses a polygon-based globe. Port with simplified geographic polygon data (GeoJSON → simplified vertices). Each country is a set of lon/lat polygons.
-- [ ] **Globe rendering** — Draw land polygons, ocean, country borders, cities. Match OpenXcom's 48 land shades + 72 ocean shades.
-- [ ] **Mouse interaction** — Click-to-select, drag to rotate, scroll to zoom. `cartToPolar()` and `polarToCart()` for hit-testing.
-- [ ] **Target markers** — UFOs, bases, mission sites (blinking dots). OpenXcom's marker set with `drawTarget()`.
+- [ ] **Polar-to-cartesian projection** — OpenXcom uses a polygon-based globe with cartographic data. Port with simplified GeoJSON geographic polygons. See [`src/Geoscape/Globe.h`](https://github.com/OpenXcom/OpenXcom/blob/master/src/Geoscape/Globe.h) — `polarToCart()`, `cartToPolar()`, and the polygon cache system.
+- [ ] **Globe rendering** — Draw land polygons, ocean, country borders, cities. OpenXcom uses 48 land shades + 72 ocean shades. See `drawOcean()`, `drawLand()`, `drawShadow()`, `drawDetail()`.
+- [ ] **Mouse interaction** — Click to select, drag to rotate, scroll to zoom. `Globe::mousePress()`/`mouseRelease()` for drag-rotation, `rotateLeft()`/`rotateRight()`/`rotateUp()`/`rotateDown()`.
+- [ ] **Target markers** — UFOs, bases, mission sites (blinking dots). See `drawTarget()` and `blink()`.
 
 #### 3.2 Time System
-- [ ] **Geoscape timer** — 5-second, 1-minute, 5-minute, 30-minute, 1-hour, 1-day, 1-month speed buttons
-- [ ] **Event scheduling** — UFO arrival/departure, mission progression, research completion, manufacturing
-- [ ] **Date/time display** — Weekday, day, month, year, UTC time
+- [ ] **Geoscape timer** — 5-second, 1-minute, 5-minute, 30-minute, 1-hour, 1-day, 1-month speed buttons. Port of [`src/Geoscape/GeoscapeState.h`](https://github.com/OpenXcom/OpenXcom/blob/master/src/Geoscape/GeoscapeState.h) — `time5Seconds()`, `time10Minutes()`, `time30Minutes()`, `time1Hour()`, `time1Day()`, `time1Month()`.
+- [ ] **Event scheduling** — UFO arrival/departure, mission progression, research completion, manufacturing.
+- [ ] **Date/time display** — Weekday, day, month, year, funds. See `timeDisplay()` in GeoscapeState.
 
 #### 3.3 Base Management
-- [ ] **Base layout** — Grid-based facility placement (hangars, living quarters, labs, workshops, etc.)
-- [ ] **Facility data** — Size, cost, build time, power, function, adjacency bonuses
-- [ ] **Personnel** — Soldier hiring, stats, promotion, wound recovery, psi training
-- [ ] **Craft management** — Purchase, equip, refuel, rearm interceptors
-- [ ] **Manufacturing** — Item production queue
+- [ ] **Base layout** — Grid-based facility placement (hangars, living quarters, labs, workshops, etc.). See [`src/Basescape/`](https://github.com/OpenXcom/OpenXcom/tree/master/src/Basescape) directory.
+- [ ] **Facility data** — Size, cost, build time, power, function, adjacency bonuses.
+- [ ] **Personnel** — Soldier hiring, stats, promotion, wound recovery, psi training. See [`src/Savegame/Soldier.h`](https://github.com/OpenXcom/OpenXcom/blob/master/src/Savegame/Soldier.h) and related.
+- [ ] **Craft management** — Purchase, equip, refuel, rearm interceptors. See [`src/Savegame/Craft.h`](https://github.com/OpenXcom/OpenXcom/blob/master/src/Savegame/Craft.h).
+- [ ] **Manufacturing** — Item production queue.
 
 #### 3.4 Research & Tech Tree
-- [ ] **Research projects** — Tech tree modeled as prerequisite graph. Topics auto-discovered from alien artifacts.
-- [ ] **UFOpaedia** — Encyclopedia of all discovered tech, enemies, items
+- [ ] **Research projects** — Tech tree modeled as prerequisite graph. Topics auto-discovered from alien artifacts. See [`src/Savegame/Research.h`](https://github.com/OpenXcom/OpenXcom/blob/master/src/Savegame/Research.h) and `RuleResearch` in the mod system.
+- [ ] **UFOpaedia** — Encyclopedia of all discovered tech, enemies, items. See [`src/Ufopaedia/`](https://github.com/OpenXcom/OpenXcom/tree/master/src/Ufopaedia) directory.
 
 #### 3.5 Alien Mission Engine
-- [ ] **Mission generation** — Alien missions (infiltration, harvest, terror, base attack, final assault) scheduled via mission script rules
-- [ ] **UFO spawning** — Types, routes, behaviors (patrol, land, escape)
-- [ ] **Interception/dogfight** — Simple 2D dogfight view (OpenXcom's `DogfightState`)
-- [ ] **Funding system** — Monthly council report, funding changes based on activity in each region
+- [ ] **Mission generation** — Alien missions (infiltration, harvest, terror, base attack, final assault) scheduled via mission script rules. See `determineAlienMissions()` and `processCommand()` in GeoscapeState.
+- [ ] **UFO spawning** — Types, routes, behaviors (patrol, land, escape).
+- [ ] **Interception/dogfight** — 2D dogfight view. Port of [`src/Geoscape/DogfightState.h`](https://github.com/OpenXcom/OpenXcom/blob/master/src/Geoscape/DogfightState.h).
+- [ ] **Funding system** — Monthly council report, funding changes based on regional activity. See [`src/Geoscape/FundingState.h`](https://github.com/OpenXcom/OpenXcom/blob/master/src/Geoscape/FundingState.h) and `RuleRegion` in the mod system.
 
 #### 3.6 Save System
-- [ ] **IndexedDB persistence** — Save/load entire game state as JSON blob
-- [ ] **Auto-save** — On geoscape month-end and battle round start
-- [ ] **Export/import** — Download save file as JSON for backup
+- [ ] **IndexedDB persistence** — Save/load entire game state as JSON blob. OpenXcom uses YAML serialization (see [`src/Savegame/SavedGame.h`](https://github.com/OpenXcom/OpenXcom/blob/master/src/Savegame/SavedGame.h) and [`src/Savegame/SavedBattleGame.h`](https://github.com/OpenXcom/OpenXcom/blob/master/src/Savegame/SavedBattleGame.h)). Port to JSON for native browser compatibility.
+- [ ] **Auto-save** — On geoscape month-end and battle round start.
+- [ ] **Export/import** — Download save file as JSON for backup.
 
 **Deliverable:** Complete strategic game — build bases, research tech, intercept UFOs, manage funding. ~4-5 weeks.
 
