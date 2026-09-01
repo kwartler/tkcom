@@ -1,6 +1,6 @@
 # TKCom
 
-**Architecture:** Browser-native tactical strategy  
+**What it is:** An offline web tactical strategy game  
 **Status:** Approved plan, engine foundation next  
 **Reference:** [OpenXcom](https://github.com/OpenXcom/OpenXcom)
 

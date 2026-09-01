@@ -1,4 +1,4 @@
-# TKCom Browser-Native Tactical Strategy Game
+# TKCom Web Tactical Strategy Game
 
 **Status:** Approved, revision 1  
 **Date:** September 1, 2026  
@@ -8,7 +8,7 @@
 
 ## 1. Executive decision
 
-Build TKCom as an **offline-first, browser-native tactical strategy game** that preserves the structural strengths of OpenXcom without attempting to ship X-COM's story, names, data, graphics, sounds, maps, or other copyrighted content.
+Build TKCom as an **offline web tactical strategy game**: it runs entirely in the browser and keeps working with no internet after the first load. It preserves the structural strengths of OpenXcom without attempting to ship X-COM's story, names, data, graphics, sounds, maps, or other copyrighted content.
 
 The product should run entirely in a browser for its default mode:
 
