@@ -2,16 +2,27 @@
   "name": "tkcom",
   "private": true,
   "version": "0.1.0",
-  "description": "OpenXcom browser port — Engine & Renderer Foundation",
+  "description": "Offline web tactical strategy game",
   "type": "module",
+  "workspaces": ["apps/*", "packages/*"],
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview",
-    "check": "tsc --noEmit"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "check": "tsc --noEmit -p tsconfig.json",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "lint": "biome lint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dev:game": "vite apps/game",
+    "dev:editor": "vite apps/map-editor",
+    "build:game": "vite build apps/game",
+    "build:editor": "vite build apps/map-editor",
+    "build": "vite build apps/game && vite build apps/map-editor"
   },
   "devDependencies": {
-    "typescript": "^5.5.0",
-    "vite": "^5.4.0"
+    "@biomejs/biome": "^1.9.4",
+    "typescript": "^5.6.0",
+    "vite": "^5.4.0",
+    "vitest": "^2.1.0"
   }
 }
