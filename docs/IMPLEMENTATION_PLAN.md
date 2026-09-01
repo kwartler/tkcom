@@ -88,6 +88,7 @@ CAMPAIGN CLOCK
 - Mobile-phone-first controls. Tablet support is desirable; desktop browser is the initial target.
 - A massive globe simulation before the tactical vertical slice works.
 - A general-purpose commercial level editor. The editor serves this game and its schema.
+- LLM-assisted gameplay. Language-model features (squad callouts that affect readiness, an interactive adversary intelligence) are a deliberate post-alpha future state, specified in Section 21 so the architecture stays ready for them, but they are out of scope for the first alpha.
 
 ---
 
@@ -1149,6 +1150,8 @@ The following ADRs should be written and approved as work begins:
 - ADR-009: Optional Cloudflare sync service.
 - ADR-010: Fixed-point simulation math and integer PRNG for cross-engine determinism.
 - ADR-011: Untrusted-archive import safety policy.
+- ADR-012: LLM interactions live at the input boundary and are recorded as seeded commands, never mutating the deterministic simulation directly (post-alpha).
+- ADR-013: LLM features degrade gracefully to deterministic scripted fallbacks and are never required for offline core play (post-alpha).
 
 ---
 
@@ -1170,6 +1173,8 @@ The following ADRs should be written and approved as work begins:
 | A browser update breaks saves | Campaign loss | Schema fixtures, migrations, export, compatibility tests |
 | Large art files bloat Git | Slow repo and CI | Optimized runtime assets, separate source storage when needed |
 | Optional server becomes the project | Core game delayed | No sync work until offline alpha exit gate passes |
+| Future LLM features break determinism or leak into core sim | Replay fails, offline play breaks | Keep the model at the input boundary, record its outcome as a seeded command, deterministic scripted fallback, no sim dependency (Section 21) |
+| Player text jailbreaks the adversary persona | Broken immersion, injection, cost abuse | Untrusted-input sandbox, system contract, no unchecked path to commands or saves, rate and cost caps |
 
 ---
 
@@ -1226,3 +1231,52 @@ Primary references used for this plan:
 - Cloudflare Workers, D1, and R2 official pricing documentation checked September 1, 2026.
 
 This plan uses OpenXcom as a behavioral and architectural reference. It does not authorize copying original game data or mechanically translating GPL source under the recommended clean-room path.
+
+---
+
+## 21. Future state, optional LLM-assisted play (post-alpha)
+
+This is a locked-in direction to design for, not first-alpha work. The plot and setting are still to be written, so this section fixes the technical boundaries now so nothing built before the alpha makes these features impossible later.
+
+### 21.1 The two intended features
+
+1. **Squad communication and callouts.** An operative can issue a natural-language callout such as a warning that a hostile is around a corner. The callout raises the readiness of nearby allies: shared contact knowledge, a reaction/overwatch bias, or a small situational modifier, so an allied unit can respond during the enemy turn instead of being caught flat.
+2. **Adversary intelligence persona.** A language model voices an original hostile intelligence the player can interact with: interrogation of a captured unit, taunts, misdirection, or negotiation. It provides flavor and, where explicitly designed, bounded influence over hostile behavior.
+
+### 21.2 Non-negotiable constraint: the LLM must not break determinism
+
+Section 6 makes the simulation deterministic and hash-verified across browsers. A language model is nondeterministic and usually networked, so it must live **outside** the hashed simulation, at the same boundary as player input:
+
+- The LLM never mutates simulation state directly.
+- An LLM interaction is treated like a player command. Its outcome is resolved into an ordinary seeded `GameCommand` or event (for example `IssueCallout` producing `AllyReadinessRaised`) and written to the replay log.
+- Replay and save-load reproduce the recorded command, never by calling the model again. A save that used the LLM must replay identically with the network off.
+
+### 21.3 Mechanical grounding, not free-text control
+
+Free model text must never directly drive mechanics; that is nondeterministic, exploitable, and a prompt-injection surface. Use grounded patterns instead:
+
+- The engine decides the mechanical truth from real game state (which contacts are actually visible, which allies are in range). The LLM narrates that truth in natural language.
+- Where the LLM proposes an action, the deterministic rules validate it against real state and action-point cost before it becomes a command, exactly as AI proposals are validated in Section 7.6.
+- Player-supplied text aimed at the adversary persona is untrusted input. Sandbox it, constrain it with a system contract, and never let it reach tool calls, saves, or engine commands unchecked.
+
+### 21.4 Offline-first tension and graceful degradation
+
+The product is offline-first with no required server. LLM features are an enhancement layer, never a dependency for core play:
+
+- With no model available, callouts fall back to a deterministic scripted line set and the same mechanical readiness effect; the adversary persona falls back to authored lines. Gameplay is unchanged.
+- A networked model is reached only through the optional server boundary (Section 12). API credentials never ship in the client bundle, and calls are rate-limited and cost-capped.
+- An on-device or WebGPU-hosted small model may later provide offline generation; treat it as an optional adapter behind the same interface, not the baseline.
+
+### 21.5 Architectural placement
+
+- Add a future `packages/narrative` (or `llm-adapter`) package that exposes a provider-agnostic interface: given a grounded, structured game-state summary, return either flavor text or a proposed command.
+- Default to the latest Claude models when a hosted provider is used, kept behind the adapter so the provider is swappable.
+- Keep the model strictly at the input/presentation boundary. The `battle-sim` and `campaign-sim` packages must have no knowledge of the adapter.
+
+### 21.6 What to protect now, before the alpha
+
+To keep this future open without building it yet:
+
+- Keep the command/event model and replay log expressive enough to carry an externally sourced command with its recorded result.
+- Keep callout-style effects (shared knowledge, readiness bias) representable in the battle state even if only scripted triggers use them at first.
+- Keep the adversary persona's influence expressed as ordinary validated commands, so the deterministic AI and a future LLM use the same path.

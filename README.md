@@ -92,6 +92,15 @@ bun run preview
 
 The current build has been verified with Bun 1.3.11.
 
+## Future direction: optional LLM-assisted play
+
+A locked-in direction for after the first alpha, not first-alpha work:
+
+- Squad callouts, where an operative's natural-language warning raises nearby allies' readiness so they can react on the enemy turn.
+- An original adversary intelligence persona the player can interrogate, negotiate with, or be taunted by.
+
+These are designed as an enhancement layer that never breaks the deterministic simulation or offline play: the model sits at the input boundary, its outcome is recorded as an ordinary seeded command, and everything falls back to deterministic scripted behavior with no model available. Details and constraints are in Section 21 of the plan.
+
 ## Licensing boundary
 
 OpenXcom is GPL-licensed and requires original X-COM resources for normal use. TKCom must not distribute those copyrighted assets or mechanically translate OpenXcom source unless the project deliberately chooses a GPL derivative path.
