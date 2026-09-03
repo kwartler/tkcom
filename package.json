@@ -3,6 +3,8 @@
   "private": true,
   "version": "0.1.0",
   "description": "Offline web tactical strategy game",
+  "license": "Apache-2.0",
+  "author": "Ted Kwartler",
   "type": "module",
   "workspaces": ["apps/*", "packages/*"],
   "scripts": {

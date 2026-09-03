@@ -1,0 +1,23 @@
+TKCom
+Copyright 2026 Ted Kwartler
+
+This product's source code is licensed under the Apache License, Version 2.0
+(see the LICENSE file).
+
+Scope of this license:
+
+- The Apache-2.0 license covers the TKCom engine and tooling SOURCE CODE only.
+- Original game CONTENT and ASSETS (art, audio, story, text, world, unit and
+  item designs, maps, and other creative content) are NOT licensed under
+  Apache-2.0. Unless a specific asset carries its own license file, all such
+  content is All Rights Reserved. Per-asset origin and license records live
+  under assets-src/licenses/ as content is added.
+
+Reference and originality:
+
+- TKCom is an original, clean-room implementation. OpenXcom (GPLv3) was used
+  only as a behavioral and architectural reference. No OpenXcom source code was
+  copied or mechanically translated into this project. See
+  docs/source-notes/ for the reference policy.
+- TKCom does not include, and must never distribute, any original X-COM data,
+  art, text, story, maps, or audio.

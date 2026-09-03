@@ -101,11 +101,12 @@ A locked-in direction for after the first alpha, not first-alpha work:
 
 These are designed as an enhancement layer that never breaks the deterministic simulation or offline play: the model sits at the input boundary, its outcome is recorded as an ordinary seeded command, and everything falls back to deterministic scripted behavior with no model available. Details and constraints are in Section 21 of the plan.
 
-## Licensing boundary
+## Licensing
 
-OpenXcom is GPL-licensed and requires original X-COM resources for normal use. TKCom must not distribute those copyrighted assets or mechanically translate OpenXcom source unless the project deliberately chooses a GPL derivative path.
+TKCom is a clean-room original TypeScript implementation. OpenXcom (GPLv3) is used only as a behavioral and architectural reference; no OpenXcom source is copied or mechanically translated, and no original X-COM assets or data are ever distributed. See [`docs/decisions/ADR-001-clean-room-and-license.md`](docs/decisions/ADR-001-clean-room-and-license.md) and [`docs/source-notes/`](docs/source-notes/).
 
-The plan recommends a clean-room original TypeScript implementation based on behavior and high-level architecture. A final TKCom code license must be selected before implementation expands beyond the current prototype.
+- **Engine source code:** Apache-2.0 (see [`LICENSE`](LICENSE)). Anyone may reuse the code; this grants no rights to the game's content or to the TKCom name.
+- **Game content and assets** (art, audio, story, text, maps, designs): All Rights Reserved unless a specific asset carries its own license. Per-asset records live under `assets-src/licenses/`. See [`NOTICE`](NOTICE).
 
 ## Proposed delivery targets
 

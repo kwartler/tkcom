@@ -4,7 +4,7 @@
 **Date:** September 1, 2026  
 **Repository:** `kwartler/tkcom`  
 **Reference engine:** OpenXcom  
-**Decision gate:** Approved by Ted and merged to `main`. Implementation proceeds through the milestones below, each guarded by its own exit gate. The license path (Section 4) must still be recorded before code expands past the current prototype.
+**Decision gate:** Approved by Ted and merged to `main`. Implementation proceeds through the milestones below, each guarded by its own exit gate. The license path is decided: clean-room (Path A) with an Apache-2.0 engine code license, recorded in ADR-001.
 
 ## 1. Executive decision
 
@@ -165,7 +165,7 @@ OpenXcom is GPL-licensed, and its official README says it requires original X-CO
 
 ### 4.2 Approval required
 
-Before Milestone 1 is merged, choose one path and add the appropriate `LICENSE`, `NOTICE`, and source-reference policy. The rest of this plan assumes **Path A**.
+**Decided (ADR-001):** Path A, clean-room. The engine source code is licensed under **Apache-2.0** (`LICENSE`), with attribution and scope in `NOTICE` and the reference policy in `docs/source-notes/`. Original game content and assets are separate and All Rights Reserved unless individually licensed. The rest of this plan assumes Path A.
 
 ---
 
@@ -912,7 +912,7 @@ Recommended sequencing note: the plan front-loads a fairly broad editor MVP (Mil
 - Decide clean-room versus GPL derivative path.
 - Merge the restored `README.md` to `main` (already present on this review branch).
 - Scrub the "OpenXcom port" framing from `package.json`, `main.ts`, and `Renderer.ts` so `main` reflects the clean-room original.
-- Add license and notices.
+- Add license and notices. (Done: Apache-2.0 `LICENSE`, `NOTICE`, ADR-001, source-notes policy.)
 - Set branch protection and required CI checks.
 - Create milestone and issue templates.
 - Record architecture decisions.
@@ -1139,7 +1139,7 @@ The plan is approved, so this backlog is now active. Milestone 0 still governs o
 
 The following ADRs should be written and approved as work begins:
 
-- ADR-001: Clean-room original implementation versus GPL derivative.
+- ADR-001: Clean-room original implementation versus GPL derivative. (Accepted: Path A, Apache-2.0.)
 - ADR-002: PixiJS renderer versus custom Canvas/WebGL renderer.
 - ADR-003: React DOM shell around a framework-independent simulation.
 - ADR-004: Deterministic command and event simulation.
@@ -1203,8 +1203,8 @@ The first public alpha is done only when all of the following are true:
 Ted should approve or alter these decisions before implementation begins:
 
 1. **Repository:** Continue in the existing public `kwartler/tkcom` repo. Recommended: yes.
-2. **Implementation boundary:** Clean-room original TypeScript engine. Recommended: yes.
-3. **Licensing:** Select after deciding whether commercial flexibility matters. Required before code expansion.
+2. **Implementation boundary:** Clean-room original TypeScript engine. Decided: yes (ADR-001).
+3. **Licensing:** Decided: Apache-2.0 for engine code; content and assets separate and reserved (ADR-001).
 4. **Renderer:** PixiJS for tactical scenes, React only for DOM UI/editor chrome. Recommended: yes.
 5. **Collision fidelity:** Cell-and-height model first, not full voxel simulation. Recommended: yes.
 6. **Map builder priority:** Deliver editor MVP before tactical combat depth. Required: yes.
