@@ -1,52 +1,72 @@
 /**
- * TKCom game app entry point.
- * Bootstraps the engine loop, renderer, and initial state. This is the early
- * skeleton; the renderer is replaced by the Pixi isometric renderer per the
- * plan (Lane B).
+ * TKCom game app entry point (Lane B, B3 — game shell).
+ *
+ * Boots the Lane B PixiRenderer over the frozen emptyRoom fixture, wires the
+ * InputManager into the camera (drag = pan, wheel = zoom), registers the PWA
+ * service worker, and keeps the game offline-capable. Replaces the old Canvas
+ * 2D placeholder Renderer (which hard-coded a 320x200 X-COM-style base
+ * resolution); the renderer port is now the single drawing path.
  */
-import { AssetManager } from "./engine/AssetManager";
-import { GameLoop } from "./engine/GameLoop";
-import { Renderer } from "./engine/Renderer";
-import { StateMachine } from "./engine/StateMachine";
-import { BootState } from "./states/BootState";
-import { MenuState } from "./states/MenuState";
+import { emptyRoom } from "@tkcom/test-fixtures";
+import { PixiRenderer, type IsoCamera } from "@tkcom/renderer";
+import { InputManager } from "./input/InputManager";
 
-function main(): void {
-  const renderer = new Renderer("game-canvas", 320, 200);
-  const assets = new AssetManager();
-  const stateMachine = new StateMachine();
+const MOUNT_ID = "game-mount";
 
-  const loop = new GameLoop(
-    60,
-    (dt) => {
-      stateMachine.top?.update(dt);
-    },
-    (_interpolation) => {
-      renderer.clear("#000");
-      stateMachine.top?.render(renderer.ctx, _interpolation);
-    },
-  );
+async function boot(): Promise<void> {
+  const mount = document.getElementById(MOUNT_ID);
+  if (!(mount instanceof HTMLElement)) {
+    throw new Error(`#${MOUNT_ID} element not found`);
+  }
 
-  // Start with boot state, transition to menu when ready
-  stateMachine.push(
-    new BootState(assets, () => {
-      stateMachine.replace(new MenuState());
-    }),
-  );
+  const renderer = new PixiRenderer({ parent: mount });
+  await renderer.init();
 
-  loop.start();
+  mount.appendChild(renderer.canvas);
 
-  // Expose for dev-tools debugging
+  // Center the 3x3 emptyRoom map in the viewport at a readable zoom.
+  const bw = mount.clientWidth || 800;
+  const bh = mount.clientHeight || 600;
+  const centerZoom = 1.5;
+  const centered: IsoCamera = {
+    panX: bw / 2,
+    panY: bh / 2 - 2 * 16 * centerZoom,
+    zoom: centerZoom,
+  };
+  renderer.setCamera(centered);
+
+  await renderer.loadMap(emptyRoom);
+  renderer.setActiveLevel(0);
+
+  // Route input into the camera through the abstraction (no DOM listeners in
+  // game/main code).
+  const input = new InputManager();
+  input.setHandler({
+    onPan: ({ dx, dy }) => renderer.panBy(dx, dy),
+    onZoom: ({ factor, focalX, focalY }) => renderer.zoomBy(factor, { sx: focalX, sy: focalY }),
+  });
+  input.attach(renderer.canvas);
+
+  // PWA: register the offline cache-first service worker (no-op in dev builds
+  // that lack it, so the shell still boots when running locally).
+  if ("serviceWorker" in navigator && import.meta.env.PROD) {
+    void navigator.serviceWorker.register("./sw.js").catch((err) => {
+      console.warn("service worker registration failed:", err);
+    });
+  }
+
+  // Expose for dev-tools debugging.
   (window as unknown as { __TKCOM: unknown }).__TKCOM = {
     renderer,
-    stateMachine,
-    assets,
-    loop,
+    input,
+    env: import.meta.env,
   };
 }
 
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", main);
+  document.addEventListener("DOMContentLoaded", () => {
+    void boot().catch((err) => console.error("boot failed:", err));
+  });
 } else {
-  main();
+  void boot().catch((err) => console.error("boot failed:", err));
 }

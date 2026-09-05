@@ -1,0 +1,19 @@
+{
+  "name": "TKCom Tactical Strategy Game",
+  "short_name": "TKCom",
+  "description": "Offline-first browser tactical strategy game.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#0b0f0b",
+  "theme_color": "#0b0f0b",
+  "icons": [
+    {
+      "src": "./pwa.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
