@@ -4,7 +4,7 @@
  * PixiJS isometric renderer: scene, projection, camera, effects
  * (IMPLEMENTATION_PLAN.md Section 5.2). Vellum implements this against the
  * frozen map schema. This file defines the port the game and editor render
- * through; the Pixi dependency is added when implementation starts.
+ * through; the Pixi dependency lives inside this package only.
  */
 import type { GridPosition, MapFile } from "@tkcom/map-schema";
 
@@ -23,3 +23,17 @@ export interface RendererPort {
   resize(width: number, height: number): void;
   destroy(): void;
 }
+
+export { PixiRenderer, type PixiRendererInit } from "./PixiRenderer";
+export {
+  DEFAULT_CAMERA,
+  ISO_METRICS,
+  project,
+  unproject,
+  clampZoom,
+  clampPan,
+  type IsoCamera,
+  type IsoGrid,
+  type IsoMetrics,
+  type IsoScreen,
+} from "./projection";

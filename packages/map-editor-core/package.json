@@ -1,5 +1,5 @@
 {
-  "name": "@tkcom/renderer",
+  "name": "@tkcom/map-editor-core",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -12,8 +12,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@tkcom/content-schema": "*",
-    "@tkcom/map-schema": "*",
-    "pixi.js": "^8.20.1"
+    "@tkcom/map-schema": "*"
   }
 }

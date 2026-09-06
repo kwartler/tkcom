@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TKCom — Renderer Demo (B1)</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        background: #0b0f0b;
+        color: #ccc;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        overflow: hidden;
+      }
+      #mount {
+        position: fixed;
+        inset: 0;
+      }
+      #panel {
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        z-index: 10;
+        background: rgba(0, 0, 0, 0.7);
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 12px;
+        line-height: 1.5;
+        pointer-events: none;
+      }
+      #panel code {
+        color: #8f8;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="mount"></div>
+    <div id="panel">
+      Rendered: <code>@tkcom/test-fixtures/emptyRoom</code> (3x3, 1 level)<br />
+      Drag = pan · Wheel = zoom · Active level: <code id="level">0</code><br />
+      <span id="status">booting…</span>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

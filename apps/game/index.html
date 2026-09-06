@@ -1,22 +1,50 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TKCom Tactical Strategy Game</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
-    #game-canvas {
-      display: block;
-      width: 100%;
-      height: 100%;
-      image-rendering: pixelated;
-    }
-  </style>
-</head>
-<body>
-  <canvas id="game-canvas"></canvas>
-  <script type="module" src="/src/main.ts"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b0f0b" />
+    <meta name="description" content="TKCom — an offline-first browser tactical strategy game." />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="./pwa.svg" />
+    <title>TKCom Tactical Strategy Game</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #0b0f0b;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      #game-mount {
+        position: fixed;
+        inset: 0;
+      }
+      #hud {
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        z-index: 10;
+        color: #8f8;
+        font-size: 12px;
+        line-height: 1.5;
+        pointer-events: none;
+        text-shadow: 0 1px 2px #000;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="game-mount"></div>
+    <div id="hud">
+      TKCom
+      <span id="hud-status">booting…</span>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
 </html>
