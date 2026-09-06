@@ -16,6 +16,7 @@ import {
   clampPan,
   clampZoom,
   project,
+  pickGridCell,
   ISO_METRICS,
   type IsoCamera,
   type IsoMetrics,
@@ -37,6 +38,14 @@ const DEFAULT_STYLE: TileStyle = {
   levelStroke: 0x444444,
   hoverFill: 0xffd54f,
 };
+
+export interface RenderUnit {
+  readonly id: string;
+  readonly faction: string;
+  readonly position: GridPosition;
+  readonly hitPoints: number;
+  readonly maxHitPoints: number;
+}
 
 export interface PixiRendererInit {
   /** Parent element to mount Pixi's canvas inside. Required. */
@@ -61,6 +70,7 @@ export class PixiRenderer implements RendererPort {
   private readonly root = new Container();
   /** Ground-level container: floors, then walls, per z level. */
   private readonly levelContainers = new Map<number, Container>();
+  private readonly unitContainers = new Map<number, Container>();
   private readonly metrics: IsoMetrics;
   private readonly style: TileStyle;
   private camera: IsoCamera;
@@ -136,7 +146,15 @@ export class PixiRenderer implements RendererPort {
       c.destroy();
     }
     this.levelContainers.clear();
+    this.clearUnits();
     this.map = null;
+  }
+
+  private clearUnits(): void {
+    for (const c of this.unitContainers.values()) {
+      c.destroy();
+    }
+    this.unitContainers.clear();
   }
 
   /** Draw one cell as an isometric diamond floor plus optional wall edges. */
@@ -204,9 +222,46 @@ export class PixiRenderer implements RendererPort {
     return { sx: p.sx, sy: p.sy };
   }
 
+  pickGrid(screen: ScreenPoint, z = this.activeLevel): GridPosition {
+    return pickGridCell(screen, z, this.camera, this.metrics);
+  }
+
+  renderUnits(units: readonly RenderUnit[], selectedUnitId?: string): void {
+    this.clearUnits();
+    for (const unit of units) {
+      if (unit.hitPoints <= 0) continue;
+      const z = unit.position.z;
+      let container = this.unitContainers.get(z);
+      if (!container) {
+        container = new Container();
+        container.visible = z === this.activeLevel;
+        this.unitContainers.set(z, container);
+        this.root.addChild(container);
+      }
+
+      const p = project(unit.position, { panX: 0, panY: 0, zoom: 1 }, this.metrics);
+      const marker = new Graphics();
+      const color = factionColor(unit.faction);
+      const cy = p.sy - this.metrics.tileH * 0.65;
+      if (unit.id === selectedUnitId) {
+        marker.circle(p.sx, cy, 13).stroke({ width: 3, color: 0xffd54f });
+      }
+      marker.circle(p.sx, cy, 9).fill(color).stroke({ width: 2, color: 0x101010 });
+
+      const hpWidth = 20;
+      const hpRatio = Math.max(0, Math.min(1, unit.hitPoints / Math.max(1, unit.maxHitPoints)));
+      marker.rect(p.sx - hpWidth / 2, cy - 16, hpWidth, 3).fill(0x321010);
+      marker.rect(p.sx - hpWidth / 2, cy - 16, hpWidth * hpRatio, 3).fill(0x66bb6a);
+      container.addChild(marker);
+    }
+  }
+
   setActiveLevel(z: number): void {
     this.activeLevel = z;
     for (const [key, c] of this.levelContainers) {
+      c.visible = key === z;
+    }
+    for (const [key, c] of this.unitContainers) {
       c.visible = key === z;
     }
   }
@@ -258,4 +313,12 @@ export class PixiRenderer implements RendererPort {
     this.clearMap();
     this.app.destroy(true, { children: true, texture: true });
   }
+}
+
+function factionColor(faction: string): number {
+  if (faction === "player") return 0x42a5f5;
+  if (faction === "enemy") return 0xef5350;
+  let hash = 0;
+  for (const char of faction) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  return 0x404040 | (hash & 0xbfbfbf);
 }

@@ -81,6 +81,21 @@ export function unproject(
   return { x, y };
 }
 
+/** Resolve a screen point to the nearest grid cell on a known elevation level. */
+export function pickGridCell(
+  screen: IsoScreen,
+  z: number,
+  camera: IsoCamera = DEFAULT_CAMERA,
+  metrics: IsoMetrics = ISO_METRICS,
+): IsoGrid {
+  const elevationAdjusted = {
+    sx: screen.sx,
+    sy: screen.sy + z * metrics.levelH * camera.zoom,
+  };
+  const grid = unproject(elevationAdjusted, camera, metrics);
+  return { x: Math.round(grid.x), y: Math.round(grid.y), z };
+}
+
 /** Constrain a zoom value to a sane, finite positive range. */
 export function clampZoom(zoom: number, min = 0.25, max = 4): number {
   if (!Number.isFinite(zoom)) return 1;
