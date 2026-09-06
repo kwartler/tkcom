@@ -51,3 +51,35 @@ describe("line of sight", () => {
     expect(cells.at(-1)).toEqual({ x: 2, y: 0, z: 0 });
   });
 });
+
+function twoLevel(stairs: boolean): MapFile {
+  const lower = { position: { x: 0, y: 0, z: 0 }, floor: "core.tile.floor" };
+  return parseMapFile({
+    schemaVersion: 1,
+    dimensions: { width: 2, height: 1, levels: 2 },
+    cells: [
+      stairs ? { ...lower, tags: ["stairs"] } : lower,
+      { position: { x: 1, y: 0, z: 0 }, floor: "core.tile.floor" },
+      { position: { x: 0, y: 0, z: 1 }, floor: "core.tile.floor" },
+      { position: { x: 1, y: 0, z: 1 }, floor: "core.tile.floor" },
+    ],
+    zones: [],
+  });
+}
+
+describe("cross-level line of sight", () => {
+  it("sees straight up an open shaft", () => {
+    const t = terrainFromMap(twoLevel(true));
+    expect(hasLineOfSight(t, { x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 })).toBe(true);
+  });
+
+  it("does not see up through a floor without a shaft", () => {
+    const t = terrainFromMap(twoLevel(false));
+    expect(hasLineOfSight(t, { x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 })).toBe(false);
+  });
+
+  it("does not model diagonal cross-level sight yet", () => {
+    const t = terrainFromMap(twoLevel(true));
+    expect(hasLineOfSight(t, { x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 1 })).toBe(false);
+  });
+});

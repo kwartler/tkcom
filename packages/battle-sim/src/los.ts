@@ -40,21 +40,42 @@ export function lineCells(from: GridPosition, to: GridPosition): GridPosition[] 
   return cells;
 }
 
-/** Whether `from` can see `to`. The target cell may be opaque (you can still see the unit in it). */
+/**
+ * Whether `from` can see `to`. The target cell may be opaque (you can still see
+ * the unit standing in it).
+ *
+ * Same-level sight uses a Bresenham cell walk. Cross-level sight is modelled
+ * only up or down an open vertical shaft (same column): each level crossed must
+ * be a vertical link and not opaque. Diagonal cross-level sight is not modelled
+ * yet and returns false, per the staged plan (Section 7.4).
+ */
 export function hasLineOfSight(
   terrain: TerrainGrid,
   from: GridPosition,
   to: GridPosition,
 ): boolean {
-  if (from.z !== to.z) return false;
-  const cells = lineCells(from, to);
-  for (let i = 1; i < cells.length; i++) {
-    const prev = cells[i - 1];
-    const cur = cells[i];
-    if (prev === undefined || cur === undefined) return false;
-    if (terrain.sightBlocked(prev, cur)) return false;
-    // An opaque cell blocks sight only when it is between the endpoints.
-    if (i < cells.length - 1 && terrain.opaque(cur)) return false;
+  if (from.z === to.z) {
+    const cells = lineCells(from, to);
+    for (let i = 1; i < cells.length; i++) {
+      const prev = cells[i - 1];
+      const cur = cells[i];
+      if (prev === undefined || cur === undefined) return false;
+      if (terrain.sightBlocked(prev, cur)) return false;
+      // An opaque cell blocks sight only when it is between the endpoints.
+      if (i < cells.length - 1 && terrain.opaque(cur)) return false;
+    }
+    return true;
+  }
+
+  // Cross-level: only straight up or down a shaft for now.
+  if (from.x !== to.x || from.y !== to.y) return false;
+  const step = to.z > from.z ? 1 : -1;
+  for (let z = from.z; z !== to.z; z += step) {
+    const a: GridPosition = { x: from.x, y: from.y, z };
+    const b: GridPosition = { x: from.x, y: from.y, z: z + step };
+    if (!terrain.verticalLink(a, b)) return false;
+    // Opaque cells between the endpoints block; the target's own cell does not.
+    if (b.z !== to.z && terrain.opaque(b)) return false;
   }
   return true;
 }

@@ -28,8 +28,10 @@ const NEIGHBORS: ReadonlyArray<readonly [number, number]> = [
   [-1, -1],
 ];
 
-function chebyshev(a: GridPosition, b: GridPosition): number {
-  return Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+/** Admissible heuristic across levels: planar Chebyshev plus vertical distance. */
+function estimate(a: GridPosition, b: GridPosition): number {
+  const planar = Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+  return (planar + Math.abs(a.z - b.z)) * MOVE_COST_PER_TILE;
 }
 
 interface OpenNode {
@@ -60,7 +62,8 @@ function popBest(open: OpenNode[]): OpenNode | undefined {
 /**
  * Find the cheapest path from `start` to `goal`. `blocked` holds keys of cells
  * that cannot be entered (for example tiles occupied by other units). Returns
- * `null` when the goal is unreachable. The goal must be on the same level.
+ * `null` when the goal is unreachable. The goal may be on another level,
+ * reachable through vertical links (stairs, ladders, lifts).
  */
 export function findPath(
   terrain: TerrainGrid,
@@ -68,7 +71,6 @@ export function findPath(
   goal: GridPosition,
   blocked: ReadonlySet<string> = new Set(),
 ): Path | null {
-  if (start.z !== goal.z) return null;
   if (!terrain.walkable(goal) || blocked.has(keyOf(goal))) return null;
   const startKey = keyOf(start);
   const goalKey = keyOf(goal);
@@ -76,9 +78,7 @@ export function findPath(
 
   const gScore = new Map<string, number>([[startKey, 0]]);
   const cameFrom = new Map<string, GridPosition>();
-  const open: OpenNode[] = [
-    { key: startKey, pos: start, f: chebyshev(start, goal) * MOVE_COST_PER_TILE, order: 0 },
-  ];
+  const open: OpenNode[] = [{ key: startKey, pos: start, f: estimate(start, goal), order: 0 }];
   let order = 1;
 
   while (open.length > 0) {
@@ -90,24 +90,28 @@ export function findPath(
     const currentG = gScore.get(current.key);
     if (currentG === undefined) continue;
 
-    for (const [dx, dy] of NEIGHBORS) {
-      const next: GridPosition = { x: current.pos.x + dx, y: current.pos.y + dy, z: current.pos.z };
+    const consider = (next: GridPosition): void => {
       const nextKey = keyOf(next);
-      if (!terrain.walkable(next) || blocked.has(nextKey)) continue;
-      if (terrain.movementBlocked(current.pos, next)) continue;
-
+      if (!terrain.walkable(next) || blocked.has(nextKey)) return;
       const tentative = currentG + terrain.tileCost(next) * MOVE_COST_PER_TILE;
       const known = gScore.get(nextKey);
-      if (known !== undefined && tentative >= known) continue;
-
+      if (known !== undefined && tentative >= known) return;
       gScore.set(nextKey, tentative);
       cameFrom.set(nextKey, current.pos);
-      open.push({
-        key: nextKey,
-        pos: next,
-        f: tentative + chebyshev(next, goal) * MOVE_COST_PER_TILE,
-        order: order++,
-      });
+      open.push({ key: nextKey, pos: next, f: tentative + estimate(next, goal), order: order++ });
+    };
+
+    // Planar neighbors (walls can block the edge).
+    for (const [dx, dy] of NEIGHBORS) {
+      const next: GridPosition = { x: current.pos.x + dx, y: current.pos.y + dy, z: current.pos.z };
+      if (terrain.movementBlocked(current.pos, next)) continue;
+      consider(next);
+    }
+    // Vertical neighbors (only through a vertical link).
+    for (const dz of [1, -1] as const) {
+      const next: GridPosition = { x: current.pos.x, y: current.pos.y, z: current.pos.z + dz };
+      if (!terrain.verticalLink(current.pos, next)) continue;
+      consider(next);
     }
   }
   return null;

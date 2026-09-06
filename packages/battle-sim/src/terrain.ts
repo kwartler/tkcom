@@ -16,6 +16,14 @@ import type { Cell, GridPosition, MapFile } from "@tkcom/map-schema";
 
 export type Edge = "north" | "south" | "east" | "west";
 
+/**
+ * Cell tag marking a vertical link (stairs, ladder, lift). A cell tagged this
+ * way connects to the cell directly above it; the link is traversable and
+ * see-through in both directions. Encoded as a tag so the frozen map schema
+ * needs no change.
+ */
+export const VERTICAL_LINK_TAG = "stairs";
+
 export interface TerrainGrid {
   readonly width: number;
   readonly height: number;
@@ -30,6 +38,8 @@ export interface TerrainGrid {
   opaque(pos: GridPosition): boolean;
   /** Line of sight is blocked between two adjacent cells (by a wall). */
   sightBlocked(from: GridPosition, to: GridPosition): boolean;
+  /** A vertical link connects these two cells (same column, one level apart). */
+  verticalLink(a: GridPosition, b: GridPosition): boolean;
 }
 
 export function keyOf(pos: GridPosition): string {
@@ -70,6 +80,10 @@ export function terrainFromMap(map: MapFile): TerrainGrid {
   const wallOn = (pos: GridPosition, edge: Edge): boolean => {
     const cell = cells.get(keyOf(pos));
     return cell?.walls?.some((w) => w.edge === edge) ?? false;
+  };
+
+  const cellHasTag = (pos: GridPosition, tag: string): boolean => {
+    return cells.get(keyOf(pos))?.tags?.includes(tag) ?? false;
   };
 
   const wallBetweenOrtho = (from: GridPosition, to: GridPosition): boolean => {
@@ -114,6 +128,13 @@ export function terrainFromMap(map: MapFile): TerrainGrid {
     },
     sightBlocked(from, to) {
       return blockedByWall(from, to);
+    },
+    verticalLink(a, b) {
+      if (a.x !== b.x || a.y !== b.y) return false;
+      const dz = b.z - a.z;
+      if (Math.abs(dz) !== 1) return false;
+      const lower = dz > 0 ? a : b;
+      return cellHasTag(lower, VERTICAL_LINK_TAG);
     },
   };
 }
