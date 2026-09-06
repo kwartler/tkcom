@@ -1,5 +1,5 @@
 /**
- * @tkcom/renderer — Pixi-backed isometric renderer (Lane B, B1).
+ * @tkcom/renderer: Pixi-backed isometric renderer (Lane B, B1).
  *
  * Concrete implementation of the RendererPort using PixiJS v8. The only place
  * in the codebase that imports pixi; the rest of Lane B and the whole of
@@ -52,7 +52,7 @@ export interface PixiRendererInit {
 /**
  * Pixi-backed RendererPort implementation.
  *
- * @implements RendererPort — keeps the port contract exactly:
+ * @implements RendererPort, keeps the port contract exactly:
  *   loadMap, project, setActiveLevel, resize, destroy.
  */
 export class PixiRenderer implements RendererPort {

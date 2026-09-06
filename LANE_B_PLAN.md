@@ -1,4 +1,4 @@
-# Lane B plan v1 — renderer, editor, game shell, storage, PWA
+# Lane B plan v1: renderer, editor, game shell, storage, PWA
 
 Owner: Vellum/Aiva (`docs/WORK_SPLIT.md` Lane B). Companion plan: `docs/IMPLEMENTATION_PLAN.md`. Governing rules: stay inside my directories, read but never edit the frozen schemas and Lane A public types, never edit root config without coordination, keep branch short-lived and `main` green.
 
@@ -27,7 +27,7 @@ The frozen v1 `map-schema` supports floors, up to four wall edges, one object, t
 
 ## Phasing, small commits only, no large monolith PRs
 
-### Phase B1 — Renderer spike on my lane branch
+### Phase B1: Renderer spike on my lane branch
 Goal: de-risk the optical foundation before the editor invests breadth on top of it. This is the plan's "renderer pans and zooms over a test grid" proof.
 - Add the Pixi dependency (via Stage 0 owner so root is not touched unilaterally) or wrap it behind the existing `RendererPort` with the pixi import contained inside `packages/renderer`'s own source only.
 - Implement the `RendererPort` from `packages/renderer/src/index.ts` with a Pixi backing: `loadMap`, `project`, `setActiveLevel`, `resize`, `destroy`.
@@ -35,7 +35,7 @@ Goal: de-risk the optical foundation before the editor invests breadth on top of
 - Render `packages/test-fixtures`' `emptyRoom` (read-only import) to prove the frozen schema seam.
 - Exit gate: game or a test harness renders the fixture map, camera pans and zooms, and the build stays green. No editor or persistence in this phase.
 
-### Phase B2 — Map editor scaffold, Milestone 2 entry
+### Phase B2: Map editor scaffold, Milestone 2 entry
 Goal: prove a browser battle-map works on the frozen schema.
 - React editor app launched from `apps/map-editor`.
 - Indexed floor, wall edge, and object placement on the logical grid; elevation handling to `levels`.
@@ -45,7 +45,7 @@ Goal: prove a browser battle-map works on the frozen schema.
 - Launch current map straight into a playtest harness.
 - Exit gate: build a small multi-floor map without editing code, export, clear local data, import, and render the same map.
 
-### Phase B3 — Game shell + PWA, Milestone 1 completion
+### Phase B3: Game shell + PWA, Milestone 1 completion
 Goal: the game app runs client-side and offline.
 - Move the game app to consume the renderer port instead of the placeholder Canvas renderer; remove leftover OpenXcom-port framing and the hardcoded X-COM-style 320x200 base resolution.
 - Input abstraction in the game app.
@@ -53,7 +53,7 @@ Goal: the game app runs client-side and offline.
 - PWA shell entry.
 - Exit gate: game app opens, renders from a fixture, works after a reload, and cache-first offline after first load.
 
-### Phase B4 — Walking skeleton integration, Milestone 1 completion
+### Phase B4: Walking skeleton integration, Milestone 1 completion
 Companion to the plan's recommended de-risking item, done only if/when Lane A publishes its battle-sim public API. I consume it as a black box.
 - One fixture map, one unit that moves and fires, one enemy, a win check, an autosave on my storage, and a reload.
 - Renders whatever state the fixture produces through my renderer.

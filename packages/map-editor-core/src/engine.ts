@@ -46,7 +46,7 @@ export const DEFAULT_WALL: ContentId = "core.obj.wall-concrete";
 /** The four wall edges of a cell, in corner order. */
 export const WALL_EDGES: readonly WallEdge[] = ["north", "east", "south", "west"] as const;
 
-/** A grid cell address without payload — used for selection/painting math. */
+/** A grid cell address without payload, used for selection/painting math. */
 export interface GridCoord {
   readonly x: number;
   readonly y: number;

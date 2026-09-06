@@ -1,5 +1,5 @@
 /**
- * TKCom game app entry point (Lane B, B3 — game shell).
+ * TKCom game app entry point (Lane B, B3: game shell).
  *
  * Boots the Lane B PixiRenderer over the frozen emptyRoom fixture, wires the
  * InputManager into the camera (drag = pan, wheel = zoom), registers the PWA

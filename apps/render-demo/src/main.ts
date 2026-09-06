@@ -1,5 +1,5 @@
 /**
- * Renderer demo (B1) — boots the Lane B PixiRenderer over the emptyRoom
+ * Renderer demo (B1): boots the Lane B PixiRenderer over the emptyRoom
  * fixture and proves pan (drag) / zoom (wheel) against a live camera. This is
  * the visual exit gate for Phase B1 and the seam against the frozen schema:
  * the fixture is consumed read-only from @tkcom/test-fixtures.
@@ -44,7 +44,7 @@ async function main(): Promise<void> {
   renderer.setActiveLevel(0);
 
   mount.appendChild(renderer.canvas);
-  if (statusEl) statusEl.textContent = "ready — drag to pan, wheel to zoom";
+  if (statusEl) statusEl.textContent = "ready: drag to pan, wheel to zoom";
 
   // --- input: drag to pan, wheel to zoom about the cursor ---
   const canvas = renderer.canvas;
