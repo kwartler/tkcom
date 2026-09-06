@@ -201,9 +201,11 @@ function applyMove(
   if (unit.faction !== activeFaction(state))
     return reject(state, command, "not this faction's turn");
   if (!inBounds(state, command.to)) return reject(state, command, "target out of bounds");
-  if (command.to.z !== unit.position.z)
-    return reject(state, command, "vertical movement not supported yet");
-  if (chebyshev(unit.position, command.to) === 0)
+  if (
+    unit.position.x === command.to.x &&
+    unit.position.y === command.to.y &&
+    unit.position.z === command.to.z
+  )
     return reject(state, command, "already at target");
   if (livingUnitAt(state, command.to)) return reject(state, command, "target tile occupied");
 

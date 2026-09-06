@@ -276,3 +276,46 @@ describe("reaction fire", () => {
     expect(events(r).some((e) => e.type === "ReactionTriggered")).toBe(false);
   });
 });
+
+describe("vertical movement", () => {
+  const twoLevelStair = () =>
+    parseMapFile({
+      schemaVersion: 1,
+      dimensions: { width: 1, height: 1, levels: 2 },
+      cells: [
+        { position: { x: 0, y: 0, z: 0 }, floor: "core.tile.floor", tags: ["stairs"] },
+        { position: { x: 0, y: 0, z: 1 }, floor: "core.tile.floor" },
+      ],
+      zones: [],
+    });
+
+  it("moves a unit up a vertical link", () => {
+    const s = createBattleState({
+      map: twoLevelStair(),
+      units: [soldier({ id: "p1", faction: "player", position: { x: 0, y: 0, z: 0 } })],
+      seed: 1,
+    });
+    const r = applyCommand(s, { type: "MoveUnit", unitId: "p1", to: { x: 0, y: 0, z: 1 } });
+    expect(events(r)[0]?.type).toBe("UnitMoved");
+    expect(findUnit(r.state, "p1")?.position).toEqual({ x: 0, y: 0, z: 1 });
+  });
+
+  it("rejects a level change with no vertical link", () => {
+    const map = parseMapFile({
+      schemaVersion: 1,
+      dimensions: { width: 1, height: 1, levels: 2 },
+      cells: [
+        { position: { x: 0, y: 0, z: 0 }, floor: "core.tile.floor" },
+        { position: { x: 0, y: 0, z: 1 }, floor: "core.tile.floor" },
+      ],
+      zones: [],
+    });
+    const s = createBattleState({
+      map,
+      units: [soldier({ id: "p1", faction: "player", position: { x: 0, y: 0, z: 0 } })],
+      seed: 1,
+    });
+    const r = applyCommand(s, { type: "MoveUnit", unitId: "p1", to: { x: 0, y: 0, z: 1 } });
+    expect(events(r)[0]).toMatchObject({ type: "CommandRejected", reason: "no path to target" });
+  });
+});

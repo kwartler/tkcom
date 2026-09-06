@@ -31,7 +31,7 @@ export {
 
 export { applyCommand, applyCommands, chebyshev, hitChancePermille } from "./reduce.js";
 
-export { terrainFromMap, keyOf } from "./terrain.js";
+export { terrainFromMap, keyOf, VERTICAL_LINK_TAG } from "./terrain.js";
 export type { TerrainGrid, Edge } from "./terrain.js";
 export { findPath } from "./pathfind.js";
 export type { Path } from "./pathfind.js";

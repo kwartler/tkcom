@@ -74,3 +74,43 @@ describe("A* pathfinding", () => {
     expect(a?.cost).toBe(b?.cost);
   });
 });
+
+/** 2x1 footprint over 2 levels; the stairs are in column (0,0). */
+function twoLevelWithStair(): MapFile {
+  return parseMapFile({
+    schemaVersion: 1,
+    dimensions: { width: 2, height: 1, levels: 2 },
+    cells: [
+      { position: { x: 0, y: 0, z: 0 }, floor: "core.tile.floor", tags: ["stairs"] },
+      { position: { x: 1, y: 0, z: 0 }, floor: "core.tile.floor" },
+      { position: { x: 0, y: 0, z: 1 }, floor: "core.tile.floor" },
+      { position: { x: 1, y: 0, z: 1 }, floor: "core.tile.floor" },
+    ],
+    zones: [],
+  });
+}
+
+describe("vertical pathfinding", () => {
+  it("climbs a vertical link to reach another level", () => {
+    const t = terrainFromMap(twoLevelWithStair());
+    const p = findPath(t, { x: 1, y: 0, z: 0 }, { x: 1, y: 0, z: 1 });
+    expect(p).not.toBeNull();
+    expect(p?.steps.at(-1)).toEqual({ x: 1, y: 0, z: 1 });
+    // must route through the stair column, so the path visits level 1
+    expect(p?.steps.some((s) => s.z === 1)).toBe(true);
+  });
+
+  it("cannot change level without a vertical link", () => {
+    const map = parseMapFile({
+      schemaVersion: 1,
+      dimensions: { width: 1, height: 1, levels: 2 },
+      cells: [
+        { position: { x: 0, y: 0, z: 0 }, floor: "core.tile.floor" },
+        { position: { x: 0, y: 0, z: 1 }, floor: "core.tile.floor" },
+      ],
+      zones: [],
+    });
+    const t = terrainFromMap(map);
+    expect(findPath(t, { x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 })).toBeNull();
+  });
+});
