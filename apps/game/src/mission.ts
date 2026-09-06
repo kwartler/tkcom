@@ -9,7 +9,7 @@
 import { type BattleState, type Unit, createBattleState, findUnit } from "@tkcom/battle-sim";
 import { type CampaignState, activeOperatives, currentDay } from "@tkcom/campaign-sim";
 import type { MissionOutcome } from "@tkcom/campaign-sim";
-import { type MapFile, parseMapFile } from "@tkcom/map-schema";
+import { type GridPosition, type MapFile, parseMapFile } from "@tkcom/map-schema";
 
 const MAX_SQUAD = 4;
 const SALVAGE_PER_KILL = 50;
@@ -29,21 +29,19 @@ function missionArena(width: number, height: number): MapFile {
   });
 }
 
-export interface DeployedMission {
-  readonly battle: BattleState;
-  readonly operativeIds: readonly string[];
-  readonly missionId: string;
+/** Cells a unit can stand on (floor present, no blocking object), sorted for determinism. */
+function walkableCells(map: MapFile): GridPosition[] {
+  return map.cells
+    .filter((c) => c.floor !== undefined && c.object === undefined)
+    .map((c) => c.position)
+    .sort((a, b) => a.z - b.z || a.y - b.y || a.x - b.x);
 }
 
-/** Build a battle from the campaign's active operatives against a small enemy force. */
-export function deployMission(campaign: CampaignState, seed: number): DeployedMission {
-  const map = missionArena(8, 8);
-  const squad = activeOperatives(campaign).slice(0, MAX_SQUAD);
-
-  const players: Unit[] = squad.map((op, i) => ({
+function player(op: { id: string; xp: number }, position: GridPosition): Unit {
+  return {
     id: op.id,
     faction: "player",
-    position: { x: 0, y: i, z: 0 },
+    position,
     actionPoints: 12,
     maxActionPoints: 12,
     hitPoints: 6,
@@ -53,13 +51,14 @@ export function deployMission(campaign: CampaignState, seed: number): DeployedMi
     armor: 0,
     weaponDamage: 5,
     reaction: 0,
-  }));
+  };
+}
 
-  const enemyCount = Math.max(2, Math.min(squad.length, MAX_SQUAD));
-  const enemies: Unit[] = Array.from({ length: enemyCount }, (_v, i) => ({
+function enemy(i: number, position: GridPosition): Unit {
+  return {
     id: `hostile-${i + 1}`,
     faction: "enemy",
-    position: { x: 7, y: i + 2, z: 0 },
+    position,
     actionPoints: 12,
     maxActionPoints: 12,
     hitPoints: 6,
@@ -68,7 +67,42 @@ export function deployMission(campaign: CampaignState, seed: number): DeployedMi
     armor: 0,
     weaponDamage: 5,
     reaction: 300,
-  }));
+  };
+}
+
+export interface DeployedMission {
+  readonly battle: BattleState;
+  readonly operativeIds: readonly string[];
+  readonly missionId: string;
+}
+
+/**
+ * Build a battle from the campaign's active operatives against a small enemy
+ * force. If an authored `map` is supplied and has room, units deploy onto its
+ * walkable cells (players from one end, enemies from the other); otherwise a
+ * plain arena is generated.
+ */
+export function deployMission(
+  campaign: CampaignState,
+  seed: number,
+  authored?: MapFile,
+): DeployedMission {
+  const squad = activeOperatives(campaign).slice(0, MAX_SQUAD);
+  const enemyCount = Math.max(2, Math.min(squad.length, MAX_SQUAD));
+
+  let map = authored ?? missionArena(8, 8);
+  let cells = walkableCells(map);
+  if (cells.length < squad.length + enemyCount) {
+    map = missionArena(8, 8);
+    cells = walkableCells(map);
+  }
+
+  const fallback: GridPosition = { x: 0, y: 0, z: 0 };
+  const players: Unit[] = squad.map((op, i) => player(op, cells[i] ?? fallback));
+  const enemyCells = cells.slice(-enemyCount).reverse();
+  const enemies: Unit[] = Array.from({ length: enemyCount }, (_v, i) =>
+    enemy(i, enemyCells[i] ?? fallback),
+  );
 
   const missionId = `core.mission.d${currentDay(campaign)}.${campaign.missionsWon + campaign.missionsLost}`;
   const battle = createBattleState({ map, units: [...players, ...enemies], seed });

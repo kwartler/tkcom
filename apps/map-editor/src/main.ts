@@ -17,7 +17,7 @@ import {
 } from "@tkcom/map-editor-core";
 import { MAP_SCHEMA_VERSION, parseMapFile } from "@tkcom/map-schema";
 import { ISO_METRICS, PixiRenderer } from "@tkcom/renderer";
-import { AutosaveController, createSaveRepository } from "@tkcom/storage";
+import { AutosaveController, createMapRepository, createSaveRepository } from "@tkcom/storage";
 
 const DRAFT_ID = "editor.draft.v1";
 const ENGINE_VERSION = "0.1.0";
@@ -311,6 +311,54 @@ async function boot(): Promise<void> {
       setStatus("tile image cleared");
     });
   });
+
+  // ---- map library ----
+  const mapRepo = createMapRepository();
+  const refreshLibrary = async (): Promise<void> => {
+    const select = byId("lib-select");
+    if (!(select instanceof HTMLSelectElement)) return;
+    const summaries = await mapRepo.list();
+    select.innerHTML = summaries
+      .map((s) => `<option value="${s.id}">${s.name.replace(/[<>&"]/g, "")}</option>`)
+      .join("");
+  };
+  byId("lib-save")?.addEventListener("click", () => {
+    const nameInput = byId("lib-name");
+    const name =
+      (nameInput instanceof HTMLInputElement ? nameInput.value.trim() : "") || "untitled map";
+    const id = crypto.randomUUID?.() ?? `map-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    void mapRepo
+      .put({ id, name, map: editor.toMapFile(), updatedAt: new Date().toISOString() })
+      .then(() => refreshLibrary())
+      .then(() => setStatus(`saved "${name}" to library`));
+  });
+  byId("lib-load")?.addEventListener("click", () => {
+    const select = byId("lib-select");
+    const id = select instanceof HTMLSelectElement ? select.value : "";
+    if (!id) return;
+    void mapRepo.get(id).then((record) => {
+      if (!record) {
+        setStatus("map not found");
+        return;
+      }
+      editor = new MapEditor(record.map);
+      level = 0;
+      fitCamera();
+      scheduleRender();
+      updateButtons();
+      setStatus(`loaded "${record.name}"`);
+    });
+  });
+  byId("lib-delete")?.addEventListener("click", () => {
+    const select = byId("lib-select");
+    const id = select instanceof HTMLSelectElement ? select.value : "";
+    if (!id) return;
+    void mapRepo
+      .delete(id)
+      .then(() => refreshLibrary())
+      .then(() => setStatus("deleted from library"));
+  });
+  void refreshLibrary();
 
   fitCamera();
   updateButtons();
