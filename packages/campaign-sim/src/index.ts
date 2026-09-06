@@ -40,6 +40,7 @@ export type {
   StartResearchCommand,
   BuildFacilityCommand,
   HirePersonnelCommand,
+  RenameOperativeCommand,
   ResolveMissionCommand,
   CampaignEvent,
   MissionOutcome,

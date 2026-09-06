@@ -159,6 +159,27 @@ describe("mission outcomes and determinism", () => {
     expect(s.outcome).toEqual({ kind: "lost", reason: "squad eliminated" });
   });
 
+  it("renames an operative, trimming and rejecting empty names", () => {
+    const s0 = createCampaign({ seed: 1 });
+    const s1 = applyCampaignCommand(s0, {
+      type: "RenameOperative",
+      operativeId: "core.operative.1",
+      name: "  Wraith  ",
+    }).state;
+    expect(findOperative(s1, "core.operative.1")?.name).toBe("Wraith");
+
+    const r = applyCampaignCommand(s1, {
+      type: "RenameOperative",
+      operativeId: "core.operative.1",
+      name: "   ",
+    });
+    expect((r.events as { type: string }[])[0]).toMatchObject({
+      type: "CommandRejected",
+      reason: "empty name",
+    });
+    expect(findOperative(r.state, "core.operative.1")?.name).toBe("Wraith");
+  });
+
   it("replays a command log to an identical state hash", () => {
     const script: CampaignCommand[] = [
       { type: "HirePersonnel", role: "scientist", count: 1 },

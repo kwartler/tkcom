@@ -15,6 +15,7 @@ import {
   FACILITY_DEFS,
   FUNDING_BASELINE,
   HIRE_COST,
+  MAX_NAME_LENGTH,
   MISSION_REWARD_CREDITS,
   PER_SCIENTIST_RATE,
   RECOVERY_BASE_DAYS,
@@ -271,6 +272,19 @@ function hirePersonnel(
   return { state: s, events };
 }
 
+function renameOperative(
+  state: CampaignState,
+  command: CampaignCommand & { type: "RenameOperative" },
+): SimResult<CampaignState> {
+  const op = findOperative(state, command.operativeId);
+  if (!op) return reject(state, command, "unknown operative");
+  const name = command.name.trim().slice(0, MAX_NAME_LENGTH);
+  if (name.length === 0) return reject(state, command, "empty name");
+  const s: CampaignState = { ...state, roster: withOperative(state.roster, { ...op, name }) };
+  const events: CampaignEvent[] = [{ type: "OperativeRenamed", operativeId: op.id, name }];
+  return { state: s, events };
+}
+
 function resolveMission(
   state: CampaignState,
   command: CampaignCommand & { type: "ResolveMission" },
@@ -341,6 +355,8 @@ export function applyCampaignCommand(
       return buildFacility(state, command);
     case "HirePersonnel":
       return hirePersonnel(state, command);
+    case "RenameOperative":
+      return renameOperative(state, command);
     case "ResolveMission":
       return resolveMission(state, command);
   }
