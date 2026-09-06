@@ -88,7 +88,7 @@ All names and fiction are generic placeholders today. Needed:
 5. **Research fiction:** either a fixed tree, or seed prompts if using dynamic research (see [`design/dynamic-research.md`](design/dynamic-research.md)).
 6. **Win / lose framing.**
 
-Related design docs the code lanes will build against: [`design/base-and-campaign.md`](design/base-and-campaign.md) and [`design/dynamic-research.md`](design/dynamic-research.md).
+Related design docs the code lanes will build against: [`design/base-and-campaign.md`](design/base-and-campaign.md), [`design/dynamic-research.md`](design/dynamic-research.md), and the [`design/feature-requests.md`](design/feature-requests.md) backlog.
 
 ---
 
