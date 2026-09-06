@@ -78,3 +78,7 @@ These apply to every lane, including Lane C later.
 
 - **No em dashes or en dashes.** Do not use the `—` or `–` characters anywhere: code, comments, docs, commit messages, or user-visible strings. Use a comma, a colon, or parentheses instead. Biome does not catch this, so scan before every commit: `git grep -n "—\|–" -- . ':!LICENSE'` should return nothing. (`LICENSE` is the verbatim Apache-2.0 text and is the only exception.)
 - **Run the gates locally before pushing:** `format:check`, `lint`, `typecheck`, `test`, `build`. CI must be green before merge.
+
+## Reassignments
+
+- **2026-09-06:** Vellum is occupied on other work, so the Claude Code (Lane A) agent is taking over the **Lane B map editor** build (Milestone 2), starting with the editor MVP in `apps/map-editor` on top of `@tkcom/map-editor-core`. Both lanes are driven by one agent for now; the anti-collision rules still hold, and work continues on short-lived branches merged to `main` via PR. When Vellum returns it should branch fresh from `main`.

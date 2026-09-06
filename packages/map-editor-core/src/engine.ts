@@ -431,7 +431,8 @@ export function moveObject(doc: MapDocument, from: GridCoord, to: GridCoord): Ma
 // -- internal helpers ----------------------------------------------------------
 
 function isMapFile(value: MapDocument | MapFile): value is MapFile {
-  return !(value instanceof Map);
+  // A MapFile carries an array of cells; a MapDocument keys them in a Map.
+  return Array.isArray((value as MapFile).cells);
 }
 
 function minCoord(a: GridCoord, b: GridCoord): GridCoord {
