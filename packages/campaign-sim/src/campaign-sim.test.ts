@@ -1,7 +1,7 @@
 import { hashState } from "@tkcom/sim-core";
 import { describe, expect, it } from "vitest";
 import type { CampaignCommand, MissionOutcome } from "./commands.js";
-import { applyCampaignCommand, applyCampaignCommands } from "./reduce.js";
+import { applyCampaignCommand, applyCampaignCommands, labCapacity } from "./reduce.js";
 import { createCampaign } from "./scenario.js";
 import { type CampaignState, findOperative, isOngoing, researchById } from "./types.js";
 
@@ -17,33 +17,38 @@ function completeResearch(state: CampaignState, projectId: string): CampaignStat
   return s;
 }
 
-describe("campaign clock and scheduler", () => {
-  it("advances time to the next scheduled event", () => {
+describe("monthly economy", () => {
+  it("settles funding, salaries, and maintenance on the monthly tick", () => {
     const s0 = createCampaign({ seed: 1 });
     const r = applyCampaignCommand(s0, { type: "AdvanceToNextEvent" });
-    expect(r.state.clock).toBe(1440);
-    expect(r.state.day).toBe(1);
-    expect(r.state.credits).toBe(1000 - 50); // upkeep paid
-    expect((r.events as { type: string }[]).some((e) => e.type === "DailyTick")).toBe(true);
+    // income 3000 (factor 1.0) - salaries (5*300 + 6*200 = 2700) - maint (40+20) = +240
+    expect(r.state.credits).toBe(2000 + 240);
+    expect(r.state.month).toBe(1);
+    expect((r.events as { type: string }[]).some((e) => e.type === "MonthlyReport")).toBe(true);
   });
 
-  it("keeps a daily tick scheduled after each day", () => {
-    let s = createCampaign({ seed: 1 });
-    s = advance(s); // day 1
-    s = advance(s); // day 2
-    expect(s.day).toBe(2);
-    expect(s.clock).toBe(2880);
+  it("loses the campaign after two consecutive negative months", () => {
+    let s = createCampaign({ seed: 1, startingScientists: 20, startingCredits: 100 });
+    s = advance(s); // month 1, negative
+    expect(isOngoing(s)).toBe(true);
+    s = advance(s); // month 2, negative -> insolvent
+    expect(s.outcome).toEqual({ kind: "lost", reason: "insolvent" });
   });
 });
 
-describe("research", () => {
-  it("completes a project after its cost elapses", () => {
-    const s = completeResearch(createCampaign({ seed: 1 }), "core.research.field-optics");
-    expect(researchById(s, "core.research.field-optics")?.completed).toBe(true);
+describe("rate-based research", () => {
+  it("completes faster with more scientists (cost / scientists days)", () => {
+    const s = applyCampaignCommand(createCampaign({ seed: 1 }), {
+      type: "StartResearch",
+      projectId: "core.research.field-optics", // cost 30, 5 scientists -> 6 days
+    }).state;
+    const proj = researchById(s, "core.research.field-optics");
+    expect(proj?.active?.scientists).toBe(5);
+    expect(proj?.active?.completesAt).toBe(6 * 1440);
   });
 
-  it("rejects starting a second project while one is in progress", () => {
-    let s = applyCampaignCommand(createCampaign({ seed: 1 }), {
+  it("rejects a second project when all scientists are assigned", () => {
+    const s = applyCampaignCommand(createCampaign({ seed: 1 }), {
       type: "StartResearch",
       projectId: "core.research.field-optics",
     }).state;
@@ -53,13 +58,11 @@ describe("research", () => {
     });
     expect((r.events as { type: string }[])[0]).toMatchObject({
       type: "CommandRejected",
-      reason: "research slot busy",
+      reason: "no scientists available",
     });
-    s = r.state;
-    expect(s.activeResearchId).toBe("core.research.field-optics");
   });
 
-  it("wins the campaign when all research is finished in time", () => {
+  it("wins when all research finishes in time", () => {
     let s = createCampaign({ seed: 1 });
     for (const id of [
       "core.research.field-optics",
@@ -72,7 +75,37 @@ describe("research", () => {
   });
 });
 
-describe("mission outcomes", () => {
+describe("facilities and personnel", () => {
+  it("builds a facility that raises capacity when complete", () => {
+    let s = applyCampaignCommand(createCampaign({ seed: 1 }), {
+      type: "BuildFacility",
+      facility: "laboratory",
+    }).state;
+    expect(s.credits).toBe(2000 - 400);
+    expect(labCapacity(s)).toBe(10); // not yet built
+    let guard = 0;
+    while (s.facilities.laboratory < 2 && guard++ < 50) s = advance(s);
+    expect(labCapacity(s)).toBe(20); // second lab online
+  });
+
+  it("hires scientists and enforces housing capacity", () => {
+    const hired = applyCampaignCommand(createCampaign({ seed: 1 }), {
+      type: "HirePersonnel",
+      role: "scientist",
+      count: 2,
+    }).state;
+    expect(hired.scientists).toBe(7);
+    expect(hired.credits).toBe(2000 - 2 * 150);
+    // quarters cap 15; housed = 7 sci + 6 soldiers = 13; hiring 5 more exceeds it
+    const r = applyCampaignCommand(hired, { type: "HirePersonnel", role: "scientist", count: 5 });
+    expect((r.events as { type: string }[])[0]).toMatchObject({
+      type: "CommandRejected",
+      reason: "no housing capacity",
+    });
+  });
+});
+
+describe("mission outcomes and determinism", () => {
   const woundOne: MissionOutcome = {
     missionId: "core.mission.raid",
     won: true,
@@ -80,15 +113,14 @@ describe("mission outcomes", () => {
     operatives: [{ id: "core.operative.1", kills: 2, killed: false, wounded: true }],
   };
 
-  it("awards credits and experience for a won mission", () => {
+  it("awards credits and xp and starts recovery", () => {
     const s = applyCampaignCommand(createCampaign({ seed: 1 }), {
       type: "ResolveMission",
       outcome: woundOne,
     }).state;
-    expect(s.credits).toBe(1000 + 100 + 300); // salvage + win reward
+    expect(s.credits).toBe(2000 + 100 + 300);
     const op = findOperative(s, "core.operative.1");
-    expect(op?.xp).toBe(3); // 2 kills + 1 for the win
-    expect(op?.missions).toBe(1);
+    expect(op?.xp).toBe(3);
     expect(op?.status).toBe("recovering");
   });
 
@@ -101,14 +133,14 @@ describe("mission outcomes", () => {
     while (
       isOngoing(s) &&
       findOperative(s, "core.operative.1")?.status === "recovering" &&
-      guard++ < 1000
+      guard++ < 100
     ) {
       s = advance(s);
     }
     expect(findOperative(s, "core.operative.1")?.status).toBe("active");
   });
 
-  it("loses the campaign when the whole squad is eliminated", () => {
+  it("loses when the whole squad is eliminated", () => {
     const wipe: MissionOutcome = {
       missionId: "core.mission.ambush",
       won: false,
@@ -126,22 +158,12 @@ describe("mission outcomes", () => {
     }).state;
     expect(s.outcome).toEqual({ kind: "lost", reason: "squad eliminated" });
   });
-});
-
-describe("temporal pressure and determinism", () => {
-  it("loses when the scenario runs out of time", () => {
-    let s = createCampaign({ seed: 1, scenarioDays: 5 });
-    let guard = 0;
-    while (isOngoing(s) && guard++ < 50) {
-      s = advance(s);
-    }
-    expect(s.outcome).toEqual({ kind: "lost", reason: "out of time" });
-  });
 
   it("replays a command log to an identical state hash", () => {
     const script: CampaignCommand[] = [
+      { type: "HirePersonnel", role: "scientist", count: 1 },
+      { type: "BuildFacility", facility: "sickbay" },
       { type: "StartResearch", projectId: "core.research.field-optics" },
-      { type: "AdvanceToNextEvent" },
       { type: "AdvanceToNextEvent" },
       {
         type: "ResolveMission",

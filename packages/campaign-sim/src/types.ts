@@ -1,17 +1,20 @@
 /**
- * Campaign state types (Lane A, Milestone 6).
+ * Campaign state types (Lane A, Milestone 6, base v2).
  *
- * The strategic layer above battles: a discrete game-minute clock, a scheduled
- * event queue, a persistent roster, resources, and research
- * (IMPLEMENTATION_PLAN.md Sections 6.3 and 9). All quantities are integers so
- * the state hashes reproducibly; the RNG travels in the state.
+ * The strategic layer above battles (IMPLEMENTATION_PLAN.md Sections 6.3 and 9,
+ * designed in docs/design/base-and-campaign.md). Base v2 models the HQ as named
+ * capacities rather than a spatial grid: typed personnel (scientists, engineers,
+ * soldiers), buildable facilities, rate-based research, and a monthly economy.
+ * All quantities are integers so the state hashes reproducibly; the RNG travels
+ * in the state.
  */
 import type { CommandRecord, RngState } from "@tkcom/sim-core";
 
-/** Discrete campaign time in whole game minutes. */
 export type GameMinutes = number;
 
 export const MINUTES_PER_DAY = 1440;
+export const DAYS_PER_MONTH = 30;
+export const MINUTES_PER_MONTH = MINUTES_PER_DAY * DAYS_PER_MONTH;
 
 export type OperativeStatus = "active" | "recovering" | "dead";
 
@@ -19,31 +22,46 @@ export interface Operative {
   readonly id: string;
   readonly name: string;
   readonly status: OperativeStatus;
-  /** Experience accrued from missions and kills. */
   readonly xp: number;
-  /** Missions this operative has returned from. */
   readonly missions: number;
-  /** Game-minute at which a recovering operative returns to active, if any. */
   readonly recoveryUntil?: GameMinutes;
 }
 
+export type FacilityType =
+  | "laboratory"
+  | "workshop"
+  | "quarters"
+  | "stores"
+  | "sickbay"
+  | "detection";
+
+export type FacilityCounts = Readonly<Record<FacilityType, number>>;
+
+/** A research project. When `active` is set the project is running to a
+ * scheduled completion; progress is derived from the clock, not accrued. */
 export interface ResearchProject {
   readonly id: string;
   readonly name: string;
-  /** Personnel time required, in game minutes. */
-  readonly cost: GameMinutes;
+  /** Work required, in scientist-days. */
+  readonly cost: number;
   readonly completed: boolean;
+  readonly active?: {
+    readonly scientists: number;
+    readonly startedAt: GameMinutes;
+    readonly completesAt: GameMinutes;
+  };
 }
 
-/** Kinds of event the scheduler can fire. */
-export type ScheduledKind = "ResearchCompleted" | "OperativeRecovered" | "DailyTick";
+export type ScheduledKind =
+  | "ResearchCompleted"
+  | "OperativeRecovered"
+  | "FacilityCompleted"
+  | "MonthlyTick";
 
 export interface ScheduledEvent {
-  /** Monotonic sequence for deterministic tie-breaking at equal `at`. */
   readonly seq: number;
   readonly at: GameMinutes;
   readonly kind: ScheduledKind;
-  /** Target id where relevant (project or operative). */
   readonly ref?: string;
 }
 
@@ -54,27 +72,40 @@ export type CampaignOutcome =
 
 export interface CampaignState {
   readonly clock: GameMinutes;
-  readonly day: number;
+  readonly month: number;
   readonly rng: RngState;
   readonly credits: number;
-  readonly upkeepPerDay: number;
+  readonly scientists: number;
+  readonly engineers: number;
+  readonly facilities: FacilityCounts;
   readonly roster: readonly Operative[];
   readonly research: readonly ResearchProject[];
-  /** The single research slot in progress, if any (one HQ, personnel time). */
-  readonly activeResearchId?: string;
-  /** Priority queue, kept sorted by (at, seq). */
   readonly queue: readonly ScheduledEvent[];
   readonly nextSeq: number;
-  /** Campaign fails if this day is reached without a win. */
-  readonly scenarioDays: number;
+  /** Campaign fails if this many months pass without a win. */
+  readonly scenarioMonths: number;
+  readonly consecutiveNegativeMonths: number;
   readonly missionsWon: number;
   readonly missionsLost: number;
   readonly outcome: CampaignOutcome;
   readonly log: readonly CommandRecord[];
 }
 
+export const ALL_FACILITIES: readonly FacilityType[] = [
+  "laboratory",
+  "workshop",
+  "quarters",
+  "stores",
+  "sickbay",
+  "detection",
+];
+
 export function isOngoing(state: CampaignState): boolean {
   return state.outcome.kind === "ongoing";
+}
+
+export function currentDay(state: CampaignState): number {
+  return Math.floor(state.clock / MINUTES_PER_DAY);
 }
 
 export function activeOperatives(state: CampaignState): Operative[] {

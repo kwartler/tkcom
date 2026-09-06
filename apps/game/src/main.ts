@@ -16,12 +16,21 @@ import {
   planTurn,
 } from "@tkcom/battle-sim";
 import {
+  ALL_FACILITIES,
   CAMPAIGN_SCHEMA_VERSION,
+  type CampaignCommand,
   type CampaignState,
+  FACILITY_DEFS,
+  type FacilityType,
+  HIRE_COST,
   MISSION_REWARD_CREDITS,
   applyCampaignCommands,
   createCampaign,
+  currentDay,
+  housedPersonnel,
+  housingCapacity,
   isOngoing,
+  labCapacity,
 } from "@tkcom/campaign-sim";
 import type { GridPosition } from "@tkcom/map-schema";
 import { PixiRenderer } from "@tkcom/renderer";
@@ -89,8 +98,13 @@ async function boot(): Promise<void> {
   });
 
   const saved = await autosave.load();
-  let campaign: CampaignState = saved?.payload ?? createCampaign({ seed: 1 });
-  let message = saved ? `campaign resumed (r${saved.revision})` : "new campaign";
+  // Guard against a pre-v2 draft whose shape lacks the base-v2 fields.
+  const usableSave =
+    saved && typeof (saved.payload as { scientists?: unknown }).scientists === "number"
+      ? saved
+      : undefined;
+  let campaign: CampaignState = usableSave?.payload ?? createCampaign({ seed: 1 });
+  let message = usableSave ? `campaign resumed (r${usableSave.revision})` : "new campaign";
 
   let mode: "campaign" | "battle" = "campaign";
   let battle: BattleState | null = null;
@@ -117,10 +131,25 @@ async function boot(): Promise<void> {
     renderCampaign();
   }
 
+  const runCampaign = (cmd: CampaignCommand, okMessage: string): void => {
+    const res = applyCampaignCommands(campaign, [cmd]);
+    campaign = res.state;
+    const rejected = (res.events as { type: string; reason?: string }[]).find(
+      (e) => e.type === "CommandRejected",
+    );
+    message = rejected?.reason ? `rejected: ${rejected.reason}` : okMessage;
+    saveCampaign();
+    renderCampaign();
+  };
+
+  const BUILDABLE: FacilityType[] = ["laboratory", "quarters", "sickbay"];
+
   function renderCampaign(): void {
     const c = campaign;
     const ended = !isOngoing(c);
     const activeCount = c.roster.filter((o) => o.status === "active").length;
+    const assignedSci = c.research.reduce((n, r) => n + (r.active?.scientists ?? 0), 0);
+    const freeSci = c.scientists - assignedSci;
 
     const roster = c.roster
       .map((o) => {
@@ -131,14 +160,32 @@ async function boot(): Promise<void> {
 
     const research = c.research
       .map((r) => {
-        const control = r.completed
-          ? '<span class="muted">done</span>'
-          : c.activeResearchId === r.id
-            ? '<span class="recovering">in progress</span>'
-            : `<button data-research="${escapeHtml(r.id)}" ${ended || c.activeResearchId ? "disabled" : ""}>research</button>`;
+        let control: string;
+        if (r.completed) {
+          control = '<span class="muted">done</span>';
+        } else if (r.active) {
+          const total = r.active.completesAt - r.active.startedAt;
+          const pct =
+            total > 0
+              ? Math.min(100, Math.round(((c.clock - r.active.startedAt) / total) * 100))
+              : 0;
+          control = `<span class="recovering">researching ${pct}% (${r.active.scientists} sci)</span>`;
+        } else {
+          control = `<button data-research="${escapeHtml(r.id)}" ${ended || freeSci < 1 ? "disabled" : ""}>research</button>`;
+        }
         return `<div class="row"><span>${escapeHtml(r.name)}</span>${control}</div>`;
       })
       .join("");
+
+    const facilities = ALL_FACILITIES.map(
+      (f) =>
+        `<div class="row"><span>${f}</span><span class="muted">x${c.facilities[f]}</span></div>`,
+    ).join("");
+
+    const buildButtons = BUILDABLE.map(
+      (f) =>
+        `<button data-build="${f}" ${ended || c.credits < FACILITY_DEFS[f].buildCost ? "disabled" : ""}>build ${f} (${FACILITY_DEFS[f].buildCost})</button>`,
+    ).join(" ");
 
     const result = ended
       ? `<div class="panel"><h2>Result</h2><div class="row">${c.outcome.kind === "won" ? "VICTORY" : `DEFEAT: ${c.outcome.kind === "lost" ? escapeHtml(c.outcome.reason) : ""}`}</div></div>`
@@ -149,12 +196,24 @@ async function boot(): Promise<void> {
         <h1>TKCom Campaign</h1>
         <div id="campaign-msg">${escapeHtml(message)}</div>
         <div class="bar">
-          <span>Day ${c.day}/${c.scenarioDays}</span>
+          <span>Month ${c.month}/${c.scenarioMonths}</span>
+          <span>Day ${currentDay(c)}</span>
           <span>Credits ${c.credits}</span>
           <span>Missions ${c.missionsWon}W / ${c.missionsLost}L</span>
         </div>
+        <div class="bar">
+          <span>Scientists ${c.scientists} (${freeSci} free)</span>
+          <span>Engineers ${c.engineers}</span>
+          <span>Housing ${housedPersonnel(c)}/${housingCapacity(c)}</span>
+          <span>Lab cap ${labCapacity(c)}</span>
+        </div>
         <div class="panel"><h2>Squad</h2>${roster}</div>
         <div class="panel"><h2>Research</h2>${research}</div>
+        <div class="panel"><h2>Base</h2>${facilities}
+          <div class="bar">${buildButtons}
+            <button id="hire-sci" ${ended || c.credits < HIRE_COST ? "disabled" : ""}>hire scientist (${HIRE_COST})</button>
+          </div>
+        </div>
         <div class="bar">
           <button id="launch" class="primary" ${ended || activeCount === 0 ? "disabled" : ""}>launch mission (${Math.min(activeCount, 4)})</button>
           <button id="advance" ${ended ? "disabled" : ""}>advance time</button>
@@ -163,22 +222,22 @@ async function boot(): Promise<void> {
       </div>`;
 
     el("launch")?.addEventListener("click", () => startMission());
-    el("advance")?.addEventListener("click", () => {
-      campaign = applyCampaignCommands(campaign, [{ type: "AdvanceToNextEvent" }]).state;
-      message = `day ${campaign.day}, ${campaign.credits} cr`;
-      saveCampaign();
-      renderCampaign();
-    });
+    el("advance")?.addEventListener("click", () =>
+      runCampaign({ type: "AdvanceToNextEvent" }, "time advanced"),
+    );
+    el("hire-sci")?.addEventListener("click", () =>
+      runCampaign({ type: "HirePersonnel", role: "scientist", count: 1 }, "hired a scientist"),
+    );
     for (const btn of campaignPanel.querySelectorAll<HTMLButtonElement>("button[data-research]")) {
       btn.addEventListener("click", () => {
         const id = btn.dataset.research;
-        if (!id) return;
-        campaign = applyCampaignCommands(campaign, [
-          { type: "StartResearch", projectId: id },
-        ]).state;
-        message = "research started";
-        saveCampaign();
-        renderCampaign();
+        if (id) runCampaign({ type: "StartResearch", projectId: id }, "research started");
+      });
+    }
+    for (const btn of campaignPanel.querySelectorAll<HTMLButtonElement>("button[data-build]")) {
+      btn.addEventListener("click", () => {
+        const f = btn.dataset.build as FacilityType | undefined;
+        if (f) runCampaign({ type: "BuildFacility", facility: f }, `building ${f}`);
       });
     }
   }
@@ -242,7 +301,7 @@ async function boot(): Promise<void> {
 
   function startMission(): void {
     if (!isOngoing(campaign)) return;
-    const seed = campaign.clock + campaign.day * 7 + 1;
+    const seed = campaign.clock + currentDay(campaign) * 7 + 1;
     deployed = deployMission(campaign, seed);
     battle = deployed.battle;
     selectedUnitId = undefined;
@@ -321,7 +380,7 @@ async function boot(): Promise<void> {
     finishMission();
   });
 
-  if (!saved) {
+  if (!usableSave) {
     await autosave.saveNow(campaign);
   }
   showCampaign();
