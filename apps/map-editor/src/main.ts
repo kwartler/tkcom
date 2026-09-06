@@ -280,11 +280,46 @@ async function boot(): Promise<void> {
     }
   });
 
+  const uploadInput = byId("upload-tile");
+  if (uploadInput instanceof HTMLInputElement) {
+    uploadInput.addEventListener("change", () => {
+      const file = uploadInput.files?.[0];
+      if (!file) return;
+      if (!file.type.startsWith("image/")) {
+        setStatus("not an image file");
+        return;
+      }
+      if (file.size > 2_000_000) {
+        setStatus("image too large (2MB max)");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const src = typeof reader.result === "string" ? reader.result : "";
+        if (!src) return;
+        void renderer.setSprites({ tiles: { "core.tile.floor-concrete": src } }).then(() => {
+          scheduleRender();
+          setStatus("floor tile image applied");
+        });
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+  byId("clear-tile")?.addEventListener("click", () => {
+    void renderer.clearSprites().then(() => {
+      scheduleRender();
+      setStatus("tile image cleared");
+    });
+  });
+
   fitCamera();
   updateButtons();
   if (!saved) await autosave.saveNow(editor.toMapFile());
   setStatus(saved ? `draft resumed (r${saved.revision})` : "new draft");
   requestAnimationFrame(() => void renderLoop());
+
+  // Debug hook for verification and tooling.
+  (window as unknown as { __EDITOR: unknown }).__EDITOR = { renderer };
 }
 
 if (document.readyState === "loading") {

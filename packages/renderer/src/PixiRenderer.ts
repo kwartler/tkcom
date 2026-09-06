@@ -9,7 +9,7 @@
  * Keep the wiring isolated here: if the backend must change, only this file's
  * imports and construction change.
  */
-import { Application, Container, Graphics } from "pixi.js";
+import { Application, Container, Graphics, Sprite, Texture } from "pixi.js";
 import type { GridPosition, MapFile } from "@tkcom/map-schema";
 import type { RendererPort, ScreenPoint } from "./index";
 import {
@@ -21,6 +21,26 @@ import {
   type IsoCamera,
   type IsoMetrics,
 } from "./projection";
+
+/**
+ * Bind content ids and unit factions to image sources (URLs or data URIs).
+ * Any tile / object / unit with no bound sprite falls back to placeholder
+ * primitives, so art can be adopted incrementally.
+ */
+export interface SpriteSet {
+  readonly tiles?: Readonly<Record<string, string>>;
+  readonly objects?: Readonly<Record<string, string>>;
+  readonly units?: Readonly<Record<string, string>>;
+}
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error(`failed to load image: ${src.slice(0, 40)}`));
+    img.src = src;
+  });
+}
 
 /** Render style for placeholder visual assets (B1; no final art yet). */
 interface TileStyle {
@@ -77,6 +97,8 @@ export class PixiRenderer implements RendererPort {
   private map: MapFile | null = null;
   private activeLevel = 0;
   private mouseGrid: GridPosition | null = null;
+  /** Bound sprites: tile/object content ids, and `unit:<faction>` keys. */
+  private readonly sprites = new Map<string, Texture>();
 
   constructor(init: PixiRendererInit) {
     this.parent = init.parent;
@@ -132,6 +154,37 @@ export class PixiRenderer implements RendererPort {
     }
 
     this.applyCamera();
+  }
+
+  /**
+   * Bind image sources to tiles, objects, and unit factions. Loads each source
+   * into a texture, then redraws the current map so the sprites appear. Units
+   * are redrawn on the caller's next renderUnits call.
+   */
+  async setSprites(set: SpriteSet): Promise<void> {
+    const entries: Array<[string, string]> = [];
+    for (const [id, src] of Object.entries(set.tiles ?? {})) entries.push([id, src]);
+    for (const [id, src] of Object.entries(set.objects ?? {})) entries.push([id, src]);
+    for (const [faction, src] of Object.entries(set.units ?? {}))
+      entries.push([`unit:${faction}`, src]);
+
+    await Promise.all(
+      entries.map(async ([key, src]) => {
+        try {
+          const img = await loadImage(src);
+          this.sprites.set(key, Texture.from(img));
+        } catch (err) {
+          console.warn("sprite load failed:", err);
+        }
+      }),
+    );
+    if (this.map) await this.loadMap(this.map);
+  }
+
+  /** Drop all bound sprites and redraw with placeholder primitives. */
+  async clearSprites(): Promise<void> {
+    this.sprites.clear();
+    if (this.map) await this.loadMap(this.map);
   }
 
   /** Redraw camera transform over all levels. */
@@ -191,11 +244,14 @@ export class PixiRenderer implements RendererPort {
       }
     });
 
-    // Floor diamond at the cell's base. Cells with no floor (empty or erased)
-    // render as a faint outline so the editor grid stays visible and clickable.
+    const floorTex = cell.floor ? this.sprites.get(cell.floor) : undefined;
+    const objTex = cell.object ? this.sprites.get(cell.object) : undefined;
+
+    // Floor diamond at the cell's base. A bound sprite draws on top (below), so
+    // the fill goes transparent; cells with no floor render as a faint outline.
     tile
       .poly([x, y - h, x + w, y, x, y + h, x - w, y])
-      .fill(this.style.floorFill, cell.floor ? this.style.floorAlpha : 0.06)
+      .fill(this.style.floorFill, floorTex ? 0 : cell.floor ? this.style.floorAlpha : 0.06)
       .stroke({ width: 1, color: this.style.levelStroke });
 
     // Northern wall edge.
@@ -226,8 +282,8 @@ export class PixiRenderer implements RendererPort {
         .poly([x, y + h, x + w, y, x + w, y - h * 1.4, x, y + h - h * 1.4])
         .fill(this.style.wallFill, 0.7);
     }
-    // Object marker: a smaller diamond centered on the cell.
-    if (cell.object) {
+    // Object marker: a smaller diamond centered on the cell (unless a sprite is bound).
+    if (cell.object && !objTex) {
       tile
         .poly([x, y - h * 0.5, x + w * 0.5, y, x, y + h * 0.5, x - w * 0.5, y])
         .fill(0x6d4c41, 0.95)
@@ -235,6 +291,24 @@ export class PixiRenderer implements RendererPort {
     }
 
     target.addChild(tile);
+
+    // Bound sprites draw over the diamond, anchored to the cell.
+    if (floorTex) {
+      const sp = new Sprite(floorTex);
+      sp.anchor.set(0.5, 0.5);
+      sp.position.set(x, y);
+      sp.width = w * 2;
+      sp.height = h * 2;
+      target.addChild(sp);
+    }
+    if (objTex) {
+      const sp = new Sprite(objTex);
+      sp.anchor.set(0.5, 0.65);
+      sp.position.set(x, y);
+      sp.width = w * 1.2;
+      sp.height = h * 2;
+      target.addChild(sp);
+    }
 
     // Log-only placeholder for dimensions consistency (unused var guard).
     void dims;
@@ -271,7 +345,17 @@ export class PixiRenderer implements RendererPort {
       if (unit.id === selectedUnitId) {
         marker.circle(p.sx, cy, 11).stroke({ width: 3, color: 0xffd54f });
       }
-      marker.circle(p.sx, cy, 8).fill(color).stroke({ width: 2, color: 0x101010 });
+      const unitTex = this.sprites.get(`unit:${unit.faction}`);
+      if (unitTex) {
+        const sp = new Sprite(unitTex);
+        sp.anchor.set(0.5, 0.8);
+        sp.position.set(p.sx, cy);
+        sp.width = this.metrics.tileW;
+        sp.height = this.metrics.tileH * 2.4;
+        container.addChild(sp);
+      } else {
+        marker.circle(p.sx, cy, 8).fill(color).stroke({ width: 2, color: 0x101010 });
+      }
 
       const hpWidth = 18;
       const hpRatio = Math.max(0, Math.min(1, unit.hitPoints / Math.max(1, unit.maxHitPoints)));
