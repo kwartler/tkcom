@@ -33,9 +33,10 @@ export { applyCommand, applyCommands, chebyshev, hitChancePermille } from "./red
 
 export { terrainFromMap, keyOf, VERTICAL_LINK_TAG } from "./terrain.js";
 export type { TerrainGrid, Edge } from "./terrain.js";
-export { findPath } from "./pathfind.js";
-export type { Path } from "./pathfind.js";
+export { findPath, reachable } from "./pathfind.js";
+export type { Path, ReachEntry } from "./pathfind.js";
 export { hasLineOfSight, lineCells } from "./los.js";
+export { planTurn } from "./ai.js";
 
 export interface CreateBattleOptions {
   readonly map: MapFile;

@@ -133,3 +133,72 @@ function reconstruct(
   steps.reverse();
   return { steps, cost };
 }
+
+/** Structurally connected neighbors of `pos`: planar edges not blocked by a
+ * wall, plus vertical links. Walkability and occupancy are the caller's check. */
+function connectedNeighbors(terrain: TerrainGrid, pos: GridPosition): GridPosition[] {
+  const out: GridPosition[] = [];
+  for (const [dx, dy] of NEIGHBORS) {
+    const n: GridPosition = { x: pos.x + dx, y: pos.y + dy, z: pos.z };
+    if (!terrain.movementBlocked(pos, n)) out.push(n);
+  }
+  for (const dz of [1, -1] as const) {
+    const n: GridPosition = { x: pos.x, y: pos.y, z: pos.z + dz };
+    if (terrain.verticalLink(pos, n)) out.push(n);
+  }
+  return out;
+}
+
+export interface ReachEntry {
+  readonly pos: GridPosition;
+  readonly cost: number;
+}
+
+/**
+ * Every cell reachable from `start` for at most `maxCost` action points, keyed
+ * by cell. Uses the same terrain rules as {@link findPath} (walls, vertical
+ * links, occupancy). Deterministic; used by the AI to weigh moves.
+ */
+export function reachable(
+  terrain: TerrainGrid,
+  start: GridPosition,
+  maxCost: number,
+  blocked: ReadonlySet<string> = new Set(),
+): Map<string, ReachEntry> {
+  const startKey = keyOf(start);
+  const best = new Map<string, ReachEntry>([[startKey, { pos: start, cost: 0 }]]);
+  const frontier: Array<{ pos: GridPosition; cost: number; order: number }> = [
+    { pos: start, cost: 0, order: 0 },
+  ];
+  let order = 1;
+
+  while (frontier.length > 0) {
+    // Pop the lowest-cost frontier node (insertion-order tie-break).
+    let bi = 0;
+    let node = frontier[0];
+    if (node === undefined) break;
+    for (let i = 1; i < frontier.length; i++) {
+      const cand = frontier[i];
+      if (cand === undefined) continue;
+      if (cand.cost < node.cost || (cand.cost === node.cost && cand.order < node.order)) {
+        node = cand;
+        bi = i;
+      }
+    }
+    frontier.splice(bi, 1);
+    const knownHere = best.get(keyOf(node.pos));
+    if (knownHere !== undefined && node.cost > knownHere.cost) continue;
+
+    for (const next of connectedNeighbors(terrain, node.pos)) {
+      const nextKey = keyOf(next);
+      if (!terrain.walkable(next) || blocked.has(nextKey)) continue;
+      const cost = node.cost + terrain.tileCost(next) * MOVE_COST_PER_TILE;
+      if (cost > maxCost) continue;
+      const known = best.get(nextKey);
+      if (known !== undefined && cost >= known.cost) continue;
+      best.set(nextKey, { pos: next, cost });
+      frontier.push({ pos: next, cost, order: order++ });
+    }
+  }
+  return best;
+}
