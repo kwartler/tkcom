@@ -1,17 +1,19 @@
-/**
- * TKCom game app entry point (Lane B, B3: game shell).
- *
- * Boots the Lane B PixiRenderer over the frozen emptyRoom fixture, wires the
- * InputManager into the camera (drag = pan, wheel = zoom), registers the PWA
- * service worker, and keeps the game offline-capable. Replaces the old Canvas
- * 2D placeholder Renderer (which hard-coded a 320x200 X-COM-style base
- * resolution); the renderer port is now the single drawing path.
- */
-import { emptyRoom } from "@tkcom/test-fixtures";
+/** TKCom game shell with Pixi rendering, input, PWA, and local autosave. */
+import type { MapFile } from "@tkcom/map-schema";
 import { PixiRenderer, type IsoCamera } from "@tkcom/renderer";
+import { AutosaveController, createSaveRepository } from "@tkcom/storage";
+import { emptyRoom } from "@tkcom/test-fixtures";
 import { InputManager } from "./input/InputManager";
 
 const MOUNT_ID = "game-mount";
+const HUD_STATUS_ID = "hud-status";
+const AUTOSAVE_ID = "game.autosave";
+const ENGINE_VERSION = "0.1.0";
+
+function setStatus(message: string): void {
+  const status = document.getElementById(HUD_STATUS_ID);
+  if (status) status.textContent = message;
+}
 
 async function boot(): Promise<void> {
   const mount = document.getElementById(MOUNT_ID);
@@ -19,12 +21,26 @@ async function boot(): Promise<void> {
     throw new Error(`#${MOUNT_ID} element not found`);
   }
 
+  const repository = createSaveRepository();
+  const autosave = new AutosaveController<MapFile>(repository, {
+    saveId: AUTOSAVE_ID,
+    schemaVersion: emptyRoom.schemaVersion,
+    engineVersion: ENGINE_VERSION,
+    onSaved: (envelope) => setStatus(`saved r${envelope.revision}`),
+    onError: (error) => {
+      setStatus("save failed");
+      console.error("autosave failed:", error);
+    },
+  });
+
+  setStatus("loading save");
+  const saved = await autosave.load();
+  let currentMap: MapFile = saved?.payload ?? emptyRoom;
+
   const renderer = new PixiRenderer({ parent: mount });
   await renderer.init();
-
   mount.appendChild(renderer.canvas);
 
-  // Center the 3x3 emptyRoom map in the viewport at a readable zoom.
   const bw = mount.clientWidth || 800;
   const bh = mount.clientHeight || 600;
   const centerZoom = 1.5;
@@ -34,12 +50,9 @@ async function boot(): Promise<void> {
     zoom: centerZoom,
   };
   renderer.setCamera(centered);
-
-  await renderer.loadMap(emptyRoom);
+  await renderer.loadMap(currentMap);
   renderer.setActiveLevel(0);
 
-  // Route input into the camera through the abstraction (no DOM listeners in
-  // game/main code).
   const input = new InputManager();
   input.setHandler({
     onPan: ({ dx, dy }) => renderer.panBy(dx, dy),
@@ -47,26 +60,50 @@ async function boot(): Promise<void> {
   });
   input.attach(renderer.canvas);
 
-  // PWA: register the offline cache-first service worker (no-op in dev builds
-  // that lack it, so the shell still boots when running locally).
+  if (saved) {
+    setStatus(`loaded r${saved.revision}`);
+  } else {
+    await autosave.saveNow(currentMap);
+  }
+
   if ("serviceWorker" in navigator && import.meta.env.PROD) {
-    void navigator.serviceWorker.register("./sw.js").catch((err) => {
-      console.warn("service worker registration failed:", err);
+    void navigator.serviceWorker.register("./sw.js").catch((error) => {
+      console.warn("service worker registration failed:", error);
     });
   }
 
-  // Expose for dev-tools debugging.
+  const save = (): Promise<unknown> => autosave.saveNow(currentMap);
+  const reload = async (): Promise<MapFile | undefined> => {
+    const envelope = await autosave.load();
+    if (!envelope) return undefined;
+    currentMap = envelope.payload;
+    await renderer.loadMap(currentMap);
+    renderer.setActiveLevel(0);
+    setStatus(`reloaded r${envelope.revision}`);
+    return currentMap;
+  };
+
+  // Deliberately small debugging seam until the game-state reducer lands.
   (window as unknown as { __TKCOM: unknown }).__TKCOM = {
     renderer,
     input,
+    autosave,
+    save,
+    reload,
     env: import.meta.env,
   };
 }
 
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", () => {
-    void boot().catch((err) => console.error("boot failed:", err));
+    void boot().catch((error) => {
+      setStatus("boot failed");
+      console.error("boot failed:", error);
+    });
   });
 } else {
-  void boot().catch((err) => console.error("boot failed:", err));
+  void boot().catch((error) => {
+    setStatus("boot failed");
+    console.error("boot failed:", error);
+  });
 }

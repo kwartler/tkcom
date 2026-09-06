@@ -9,7 +9,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tkcom/map-schema": "*",
     "@tkcom/renderer": "*",
+    "@tkcom/storage": "*",
     "@tkcom/test-fixtures": "*"
   },
   "devDependencies": {
