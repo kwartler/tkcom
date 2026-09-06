@@ -70,3 +70,11 @@ Post-alpha, per Section 21 of the plan. Recorded here so no one builds it early 
 3. **Schema changes are a stop-the-world event.** If either lane needs a frozen-schema change mid-flight, it is proposed, agreed, and committed once, not edited in two branches.
 4. **Integration points.** Milestones 3 (movement) and 4 (combat) are where the lanes actually integrate, because the renderer must show what the simulation computes. Expect brief deliberate sync points there. Everything before that is cleanly parallel.
 5. **Green main.** Every merge keeps `main` building and its CI green.
+6. **Rebase before a new batch.** Merge or rebase `main` into your lane before starting new work, so you build on the latest and do not reintroduce fixes made on `main`.
+
+## Shared conventions (all lanes)
+
+These apply to every lane, including Lane C later.
+
+- **No em dashes or en dashes.** Do not use the `—` or `–` characters anywhere: code, comments, docs, commit messages, or user-visible strings. Use a comma, a colon, or parentheses instead. Biome does not catch this, so scan before every commit: `git grep -n "—\|–" -- . ':!LICENSE'` should return nothing. (`LICENSE` is the verbatim Apache-2.0 text and is the only exception.)
+- **Run the gates locally before pushing:** `format:check`, `lint`, `typecheck`, `test`, `build`. CI must be green before merge.
