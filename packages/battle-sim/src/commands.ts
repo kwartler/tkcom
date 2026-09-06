@@ -40,7 +40,15 @@ export interface UnitMovedEvent extends BaseEvent {
   readonly unitId: string;
   readonly from: GridPosition;
   readonly to: GridPosition;
+  /** Cells entered in order (excludes the origin), for the renderer to animate. */
+  readonly path: readonly GridPosition[];
   readonly apSpent: number;
+}
+
+export interface ReactionTriggeredEvent extends BaseEvent {
+  readonly type: "ReactionTriggered";
+  readonly watcherId: string;
+  readonly moverId: string;
 }
 
 export interface ProjectileResolvedEvent extends BaseEvent {
@@ -83,6 +91,7 @@ export interface CommandRejectedEvent extends BaseEvent {
 
 export type BattleEvent =
   | UnitMovedEvent
+  | ReactionTriggeredEvent
   | ProjectileResolvedEvent
   | UnitWoundedEvent
   | UnitKilledEvent
