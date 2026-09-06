@@ -24,7 +24,12 @@ export interface RendererPort {
   destroy(): void;
 }
 
-export { PixiRenderer, type PixiRendererInit, type RenderUnit } from "./PixiRenderer";
+export {
+  PixiRenderer,
+  type PixiRendererInit,
+  type RenderUnit,
+  type SpriteSet,
+} from "./PixiRenderer";
 export {
   DEFAULT_CAMERA,
   ISO_METRICS,
