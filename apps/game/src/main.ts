@@ -7,6 +7,7 @@ import {
   applyCommands,
   createBattleState,
   livingUnitAt,
+  planTurn,
 } from "@tkcom/battle-sim";
 import type { GridPosition } from "@tkcom/map-schema";
 import { PixiRenderer, type IsoCamera } from "@tkcom/renderer";
@@ -19,6 +20,10 @@ const HUD_STATUS_ID = "hud-status";
 const END_TURN_ID = "end-turn";
 const AUTOSAVE_ID = "game.battle-autosave.v1";
 const ENGINE_VERSION = "0.1.0";
+/** The faction the person at the keyboard controls; every other faction is AI. */
+const HUMAN_FACTION = "player";
+/** Delay between AI commands so the turn is watchable. */
+const AI_STEP_MS = 350;
 
 function soldier(id: string, faction: string, position: GridPosition): Unit {
   return {
@@ -134,11 +139,38 @@ async function boot(): Promise<void> {
     redraw();
   };
 
+  let aiThinking = false;
+  const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+  // Run every non-human faction's turn through the AI planner, stepping one
+  // command at a time so the player can watch it unfold.
+  const runAiTurns = async (): Promise<void> => {
+    if (aiThinking) return;
+    aiThinking = true;
+    let guard = 0;
+    while (
+      battle.outcome.kind === "ongoing" &&
+      activeFaction(battle) !== HUMAN_FACTION &&
+      guard++ < 200
+    ) {
+      for (const command of planTurn(battle)) {
+        commitCommand(command);
+        await sleep(AI_STEP_MS);
+        if (battle.outcome.kind !== "ongoing") break;
+      }
+    }
+    aiThinking = false;
+  };
+
+  const humanCanAct = (): boolean =>
+    !aiThinking && battle.outcome.kind === "ongoing" && activeFaction(battle) === HUMAN_FACTION;
+
   const input = new InputManager();
   input.setHandler({
     onPan: ({ dx, dy }) => renderer.panBy(dx, dy),
     onZoom: ({ factor, focalX, focalY }) => renderer.zoomBy(factor, { sx: focalX, sy: focalY }),
     onTap: ({ x, y }) => {
+      if (!humanCanAct()) return;
       const target = renderer.pickGrid({ sx: x, sy: y });
       const occupied = livingUnitAt(battle, target);
       const actingFaction = activeFaction(battle);
@@ -165,8 +197,10 @@ async function boot(): Promise<void> {
   input.attach(renderer.canvas);
 
   document.getElementById(END_TURN_ID)?.addEventListener("click", () => {
+    if (!humanCanAct()) return;
     selectedUnitId = undefined;
-    commitCommand({ type: "EndFactionTurn", faction: activeFaction(battle) });
+    commitCommand({ type: "EndFactionTurn", faction: HUMAN_FACTION });
+    void runAiTurns();
   });
 
   redraw();
@@ -180,6 +214,11 @@ async function boot(): Promise<void> {
     void navigator.serviceWorker.register("./sw.js").catch((error) => {
       console.warn("service worker registration failed:", error);
     });
+  }
+
+  // If a loaded save is mid enemy turn, let the AI resume immediately.
+  if (battle.outcome.kind === "ongoing" && activeFaction(battle) !== HUMAN_FACTION) {
+    void runAiTurns();
   }
 
   const reload = async (): Promise<BattleState | undefined> => {
