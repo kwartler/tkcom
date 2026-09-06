@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@tkcom/battle-sim": "*",
+    "@tkcom/campaign-sim": "*",
     "@tkcom/map-schema": "*",
     "@tkcom/renderer": "*",
     "@tkcom/storage": "*",
