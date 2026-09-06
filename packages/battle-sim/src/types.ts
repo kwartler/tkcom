@@ -26,6 +26,8 @@ export interface Unit {
   readonly armor: number;
   /** Damage dealt by this unit's weapon on a hit. */
   readonly weaponDamage: number;
+  /** Reaction (overwatch) chance in permille to interrupt an enemy that moves into sight and range. 0 disables reactions for this unit. */
+  readonly reaction: number;
 }
 
 /** Terminal result of a battle, or `ongoing`. */
