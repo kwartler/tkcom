@@ -7,7 +7,7 @@
  * knows both engines; battle-sim and campaign-sim stay decoupled.
  */
 import { type BattleState, type Unit, createBattleState, findUnit } from "@tkcom/battle-sim";
-import { type CampaignState, activeOperatives } from "@tkcom/campaign-sim";
+import { type CampaignState, activeOperatives, currentDay } from "@tkcom/campaign-sim";
 import type { MissionOutcome } from "@tkcom/campaign-sim";
 import { type MapFile, parseMapFile } from "@tkcom/map-schema";
 
@@ -70,7 +70,7 @@ export function deployMission(campaign: CampaignState, seed: number): DeployedMi
     reaction: 300,
   }));
 
-  const missionId = `core.mission.d${campaign.day}.${campaign.missionsWon + campaign.missionsLost}`;
+  const missionId = `core.mission.d${currentDay(campaign)}.${campaign.missionsWon + campaign.missionsLost}`;
   const battle = createBattleState({ map, units: [...players, ...enemies], seed });
   return { battle, operativeIds: squad.map((op) => op.id), missionId };
 }
