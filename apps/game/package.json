@@ -9,7 +9,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tkcom/battle-sim": "*",
+    "@tkcom/map-schema": "*",
     "@tkcom/renderer": "*",
+    "@tkcom/storage": "*",
     "@tkcom/test-fixtures": "*"
   },
   "devDependencies": {

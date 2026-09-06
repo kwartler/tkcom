@@ -34,8 +34,16 @@
         color: #8f8;
         font-size: 12px;
         line-height: 1.5;
-        pointer-events: none;
         text-shadow: 0 1px 2px #000;
+      }
+      #end-turn {
+        margin-left: 8px;
+        padding: 4px 8px;
+        border: 1px solid #8f8;
+        background: #102010;
+        color: #8f8;
+        font: inherit;
+        cursor: pointer;
       }
     </style>
   </head>
@@ -43,7 +51,8 @@
     <div id="game-mount"></div>
     <div id="hud">
       TKCom
-      <span id="hud-status">booting…</span>
+      <span id="hud-status">booting...</span>
+      <button id="end-turn" type="button">end turn</button>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

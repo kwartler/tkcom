@@ -15,7 +15,10 @@
       "name": "@tkcom/game",
       "version": "0.1.0",
       "dependencies": {
+        "@tkcom/battle-sim": "*",
+        "@tkcom/map-schema": "*",
         "@tkcom/renderer": "*",
+        "@tkcom/storage": "*",
         "@tkcom/test-fixtures": "*",
       },
       "devDependencies": {

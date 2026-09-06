@@ -1,5 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { project, unproject, clampZoom, clampPan, ISO_METRICS, type IsoCamera } from "./projection";
+import {
+  project,
+  unproject,
+  pickGridCell,
+  clampZoom,
+  clampPan,
+  ISO_METRICS,
+  type IsoCamera,
+} from "./projection";
 
 describe("isometric projection", () => {
   it("projects grid origin to screen origin under the default camera", () => {
@@ -41,6 +49,12 @@ describe("isometric projection", () => {
     const back = unproject(screen, cam);
     expect(Math.round(back.x)).toBe(grid.x);
     expect(Math.round(back.y)).toBe(grid.y);
+  });
+
+  it("picks the projected cell at its known elevation", () => {
+    const grid = { x: 2, y: 1, z: 3 };
+    const cam: IsoCamera = { panX: 120, panY: 75, zoom: 1.75 };
+    expect(pickGridCell(project(grid, cam), grid.z, cam)).toEqual(grid);
   });
 });
 

@@ -24,12 +24,13 @@ export interface RendererPort {
   destroy(): void;
 }
 
-export { PixiRenderer, type PixiRendererInit } from "./PixiRenderer";
+export { PixiRenderer, type PixiRendererInit, type RenderUnit } from "./PixiRenderer";
 export {
   DEFAULT_CAMERA,
   ISO_METRICS,
   project,
   unproject,
+  pickGridCell,
   clampZoom,
   clampPan,
   type IsoCamera,

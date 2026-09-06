@@ -12,6 +12,11 @@ export interface PanEvent {
   dy: number;
 }
 
+export interface TapEvent {
+  x: number;
+  y: number;
+}
+
 export interface ZoomEvent {
   factor: number;
   /** Screen-space focus point (relative to the target element). */
@@ -23,6 +28,7 @@ export interface ZoomEvent {
 export interface InputHandler {
   onPan(e: PanEvent): void;
   onZoom(e: ZoomEvent): void;
+  onTap?(e: TapEvent): void;
 }
 
 /**
@@ -42,6 +48,8 @@ export class InputManager {
   private handler: InputHandler | null = null;
   private target: HTMLElement | null = null;
   private dragging = false;
+  private moved = false;
+  private start: { x: number; y: number } | null = null;
   private last: { x: number; y: number } | null = null;
 
   setHandler(h: InputHandler | null): void {
@@ -55,7 +63,7 @@ export class InputManager {
     target.addEventListener("pointerdown", this.onPointerDown);
     target.addEventListener("pointermove", this.onPointerMove);
     target.addEventListener("pointerup", this.onPointerUp);
-    target.addEventListener("pointercancel", this.onPointerUp);
+    target.addEventListener("pointercancel", this.onPointerCancel);
     target.addEventListener("wheel", this.onWheel, { passive: false });
     return this;
   }
@@ -66,15 +74,19 @@ export class InputManager {
     target.removeEventListener("pointerdown", this.onPointerDown);
     target.removeEventListener("pointermove", this.onPointerMove);
     target.removeEventListener("pointerup", this.onPointerUp);
-    target.removeEventListener("pointercancel", this.onPointerUp);
+    target.removeEventListener("pointercancel", this.onPointerCancel);
     target.removeEventListener("wheel", this.onWheel);
     this.target = null;
     this.dragging = false;
+    this.moved = false;
+    this.start = null;
     this.last = null;
   }
 
   private readonly onPointerDown = (e: PointerEvent): void => {
     this.dragging = true;
+    this.moved = false;
+    this.start = { x: e.clientX, y: e.clientY };
     this.last = { x: e.clientX, y: e.clientY };
     if (this.target instanceof HTMLElement) {
       this.target.setPointerCapture?.(e.pointerId);
@@ -86,11 +98,37 @@ export class InputManager {
     const dx = e.clientX - this.last.x;
     const dy = e.clientY - this.last.y;
     this.last = { x: e.clientX, y: e.clientY };
-    if (dx !== 0 || dy !== 0) this.handler.onPan({ dx, dy });
+    if (this.start) {
+      const totalX = e.clientX - this.start.x;
+      const totalY = e.clientY - this.start.y;
+      if (totalX * totalX + totalY * totalY >= 16) this.moved = true;
+    }
+    if (this.moved && (dx !== 0 || dy !== 0)) this.handler.onPan({ dx, dy });
   };
 
   private readonly onPointerUp = (e: PointerEvent): void => {
+    const target = this.target;
+    if (!this.moved && target && this.handler?.onTap) {
+      const rect = target.getBoundingClientRect();
+      this.handler.onTap({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+    }
     this.dragging = false;
+    this.moved = false;
+    this.start = null;
+    this.last = null;
+    if (this.target instanceof HTMLElement && "releasePointerCapture" in this.target) {
+      try {
+        this.target.releasePointerCapture?.(e.pointerId);
+      } catch {
+        /* already released */
+      }
+    }
+  };
+
+  private readonly onPointerCancel = (e: PointerEvent): void => {
+    this.dragging = false;
+    this.moved = false;
+    this.start = null;
     this.last = null;
     if (this.target instanceof HTMLElement && "releasePointerCapture" in this.target) {
       try {
