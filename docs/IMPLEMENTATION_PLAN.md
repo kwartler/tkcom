@@ -636,6 +636,8 @@ After the vertical slice:
 - Monthly or chapter evaluation.
 - Final campaign objectives.
 
+The base, personnel, research, and economy systems above are designed in more depth, informed by the 1994 original, in [`design/base-and-campaign.md`](design/base-and-campaign.md).
+
 ---
 
 ## 10. Content system and asset pipeline
@@ -1242,6 +1244,7 @@ This is a locked-in direction to design for, not first-alpha work. The plot and 
 
 1. **Squad communication and callouts.** An operative can issue a natural-language callout such as a warning that a hostile is around a corner. The callout raises the readiness of nearby allies: shared contact knowledge, a reaction/overwatch bias, or a small situational modifier, so an allied unit can respond during the enemy turn instead of being caught flat.
 2. **Adversary intelligence persona.** A language model voices an original hostile intelligence the player can interact with: interrogation of a captured unit, taunts, misdirection, or negotiation. It provides flavor and, where explicitly designed, bounded influence over hostile behavior.
+3. **Dynamic, LLM-authored research.** The player names a research goal in plain language and a model generates a bounded, one-shot project plan (waves, costs, resulting device stats) that then runs as a deterministic campaign project. Designed in [`design/dynamic-research.md`](design/dynamic-research.md); it follows the same input-boundary and record-as-data rule as the features above.
 
 ### 21.2 Non-negotiable constraint: the LLM must not break determinism
 

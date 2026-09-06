@@ -63,6 +63,35 @@ Post-alpha, per Section 21 of the plan. Recorded here so no one builds it early 
 
 ---
 
+## Lane D: Creative and content inputs (owner: Ted)
+
+Human-authored inputs the code lanes depend on. Tracked here so the dependency is explicit and visible; these are Ted's to produce. (The label is "Lane D" because "Lane C" above is the LLM-assisted play lane.)
+
+### Graphics (Ted)
+
+Everything on screen today is placeholder vector primitives; there are no image assets in the repo. To move to real art (plan Section 10.3), provide:
+
+- **Tiles:** floor / wall / object sprites drawn for the isometric diamond (about a 64x32 px footprint at 1x), packed as a **WebP or PNG atlas plus a JSON frame map**.
+- **Units:** operative and enemy sprites (idle is enough to start; facing and animation later).
+- **UI:** optional; the current terminal-green look is functional.
+
+The renderer's sprite path (currently it draws primitives only) will be built to consume these once a naming convention and a first atlas exist. Art direction follows the setting decision below.
+
+### Plot (Ted, needed by the code lanes)
+
+All names and fiction are generic placeholders today. Needed:
+
+1. **Setting and threat** (drives art direction and naming).
+2. **Player organization and operatives** (org name, operative naming scheme).
+3. **Enemy faction(s):** name, flavor, a few unit types.
+4. **Three mission types:** the fiction (mechanics already exist).
+5. **Research fiction:** either a fixed tree, or seed prompts if using dynamic research (see [`design/dynamic-research.md`](design/dynamic-research.md)).
+6. **Win / lose framing.**
+
+Related design docs the code lanes will build against: [`design/base-and-campaign.md`](design/base-and-campaign.md) and [`design/dynamic-research.md`](design/dynamic-research.md).
+
+---
+
 ## Coordination mechanics
 
 1. **One branch per lane** (for example `lane/sim`, `lane/editor`), each merging to `main` independently. Keep branches short-lived and merge often.
