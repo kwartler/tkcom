@@ -32,6 +32,7 @@ function soldier(id: string, faction: string, position: GridPosition): Unit {
     aim: 700,
     armor: 0,
     weaponDamage: 5,
+    reaction: 0,
   };
 }
 
@@ -59,6 +60,8 @@ function eventMessage(events: readonly BattleEvent[]): string {
       return event.reason;
     case "UnitMoved":
       return `${event.unitId} moved, ${event.apSpent} AP`;
+    case "ReactionTriggered":
+      return `${event.watcherId} reacts`;
     case "ProjectileResolved":
       return event.hit ? `hit for ${event.damage}` : "shot missed";
     case "UnitWounded":
