@@ -163,6 +163,7 @@ export class PixiRenderer implements RendererPort {
     cell: {
       position: GridPosition;
       floor?: string;
+      object?: string;
       walls?: { edge: string; tile: string }[];
     },
     dims: { width: number; height: number },
@@ -190,10 +191,11 @@ export class PixiRenderer implements RendererPort {
       }
     });
 
-    // Floor diamond at the cell's base.
+    // Floor diamond at the cell's base. Cells with no floor (empty or erased)
+    // render as a faint outline so the editor grid stays visible and clickable.
     tile
       .poly([x, y - h, x + w, y, x, y + h, x - w, y])
-      .fill(this.style.floorFill, this.style.floorAlpha)
+      .fill(this.style.floorFill, cell.floor ? this.style.floorAlpha : 0.06)
       .stroke({ width: 1, color: this.style.levelStroke });
 
     // Northern wall edge.
@@ -209,6 +211,27 @@ export class PixiRenderer implements RendererPort {
       tile
         .poly([x, y - h, x - w, y, x - w, y - h * 1.4, x, y - h - h * 1.4])
         .fill(this.style.wallFill, 0.7);
+    }
+    // Southern wall edge (front-left).
+    const hasSouth = cell.walls?.some((w) => w.edge === "south");
+    if (hasSouth) {
+      tile
+        .poly([x - w, y, x, y + h, x, y + h - h * 1.4, x - w, y - h * 1.4])
+        .fill(this.style.wallFill, 0.55);
+    }
+    // Eastern wall edge (front-right).
+    const hasEast = cell.walls?.some((w) => w.edge === "east");
+    if (hasEast) {
+      tile
+        .poly([x, y + h, x + w, y, x + w, y - h * 1.4, x, y + h - h * 1.4])
+        .fill(this.style.wallFill, 0.7);
+    }
+    // Object marker: a smaller diamond centered on the cell.
+    if (cell.object) {
+      tile
+        .poly([x, y - h * 0.5, x + w * 0.5, y, x, y + h * 0.5, x - w * 0.5, y])
+        .fill(0x6d4c41, 0.95)
+        .stroke({ width: 1, color: 0x201510 });
     }
 
     target.addChild(tile);
@@ -242,16 +265,19 @@ export class PixiRenderer implements RendererPort {
       const p = project(unit.position, { panX: 0, panY: 0, zoom: 1 }, this.metrics);
       const marker = new Graphics();
       const color = factionColor(unit.faction);
-      const cy = p.sy - this.metrics.tileH * 0.65;
+      // Keep the marker and its HP bar within the unit's own diamond so they do
+      // not overlap the northern neighbour tile and steal clicks meant for it.
+      const cy = p.sy;
       if (unit.id === selectedUnitId) {
-        marker.circle(p.sx, cy, 13).stroke({ width: 3, color: 0xffd54f });
+        marker.circle(p.sx, cy, 11).stroke({ width: 3, color: 0xffd54f });
       }
-      marker.circle(p.sx, cy, 9).fill(color).stroke({ width: 2, color: 0x101010 });
+      marker.circle(p.sx, cy, 8).fill(color).stroke({ width: 2, color: 0x101010 });
 
-      const hpWidth = 20;
+      const hpWidth = 18;
       const hpRatio = Math.max(0, Math.min(1, unit.hitPoints / Math.max(1, unit.maxHitPoints)));
-      marker.rect(p.sx - hpWidth / 2, cy - 16, hpWidth, 3).fill(0x321010);
-      marker.rect(p.sx - hpWidth / 2, cy - 16, hpWidth * hpRatio, 3).fill(0x66bb6a);
+      const hpY = cy - this.metrics.tileH * 0.6;
+      marker.rect(p.sx - hpWidth / 2, hpY, hpWidth, 3).fill(0x321010);
+      marker.rect(p.sx - hpWidth / 2, hpY, hpWidth * hpRatio, 3).fill(0x66bb6a);
       container.addChild(marker);
     }
   }

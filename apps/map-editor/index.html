@@ -4,9 +4,165 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>TKCom Map Editor</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #0b0f0b;
+        color: #8f8;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 12px;
+      }
+      #app {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+      }
+      #toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 8px;
+        border-bottom: 1px solid #2c3a2c;
+      }
+      #toolbar .sep {
+        width: 1px;
+        height: 20px;
+        background: #2c3a2c;
+        margin: 0 4px;
+      }
+      #toolbar .label {
+        color: #6a9a6a;
+      }
+      #main {
+        flex: 1;
+        display: flex;
+        min-height: 0;
+      }
+      #editor-canvas {
+        flex: 1;
+        position: relative;
+        overflow: hidden;
+      }
+      #side {
+        width: 240px;
+        border-left: 1px solid #2c3a2c;
+        padding: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        overflow: auto;
+      }
+      button {
+        padding: 4px 8px;
+        border: 1px solid #3c5a3c;
+        background: #102010;
+        color: #8f8;
+        font: inherit;
+        cursor: pointer;
+      }
+      button.active {
+        border-color: #aef0ae;
+        color: #dfffdf;
+        background: #16301a;
+      }
+      button:disabled {
+        opacity: 0.4;
+        cursor: default;
+      }
+      input {
+        width: 44px;
+        background: #0b0f0b;
+        color: #8f8;
+        border: 1px solid #3c5a3c;
+        font: inherit;
+        padding: 2px 4px;
+      }
+      textarea {
+        width: 100%;
+        height: 160px;
+        background: #0b0f0b;
+        color: #8f8;
+        border: 1px solid #3c5a3c;
+        font: inherit;
+        font-size: 11px;
+        resize: vertical;
+      }
+      h2 {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #6a9a6a;
+      }
+      #validation {
+        white-space: pre-wrap;
+        font-size: 11px;
+        min-height: 16px;
+      }
+      .ok {
+        color: #aef0ae;
+      }
+      .err {
+        color: #e0a0a0;
+      }
+    </style>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <div id="toolbar">
+        <span class="label">tool</span>
+        <button data-tool="floor" class="active">floor</button>
+        <button data-tool="wall">wall</button>
+        <button data-tool="object">object</button>
+        <button data-tool="erase">erase</button>
+        <span class="sep"></span>
+        <span class="label">edge</span>
+        <button data-edge="north" class="active">N</button>
+        <button data-edge="east">E</button>
+        <button data-edge="south">S</button>
+        <button data-edge="west">W</button>
+        <span class="sep"></span>
+        <span class="label">level</span>
+        <button id="level-down" type="button">-</button>
+        <span id="level-label">0 / 1</span>
+        <button id="level-up" type="button">+</button>
+        <span class="sep"></span>
+        <button id="undo" type="button">undo</button>
+        <button id="redo" type="button">redo</button>
+        <span class="sep"></span>
+        <button id="zoom-out" type="button">zoom -</button>
+        <button id="zoom-in" type="button">zoom +</button>
+        <button id="recenter" type="button">recenter</button>
+      </div>
+      <div id="main">
+        <div id="editor-canvas"></div>
+        <div id="side">
+          <h2>New map</h2>
+          <div>
+            w <input id="new-w" type="number" value="10" min="1" max="60" />
+            h <input id="new-h" type="number" value="10" min="1" max="60" />
+            z <input id="new-z" type="number" value="1" min="1" max="8" />
+          </div>
+          <button id="new-map" type="button">new floor map</button>
+          <h2>Validate</h2>
+          <button id="validate" type="button">validate map</button>
+          <div id="validation"></div>
+          <h2>Export / Import (.tkmap JSON)</h2>
+          <button id="export" type="button">export to box</button>
+          <button id="import" type="button">import from box</button>
+          <textarea id="io" spellcheck="false" placeholder="map JSON"></textarea>
+          <div id="status"></div>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
