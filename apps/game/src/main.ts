@@ -111,6 +111,7 @@ async function boot(): Promise<void> {
   let deployed: DeployedMission | null = null;
   let selectedUnitId: string | undefined;
   let aiThinking = false;
+  let editingOperativeId: string | undefined;
 
   const renderer = new PixiRenderer({ parent: mountEl });
   await renderer.init();
@@ -154,7 +155,11 @@ async function boot(): Promise<void> {
     const roster = c.roster
       .map((o) => {
         const cls = o.status === "dead" ? "dead" : o.status === "recovering" ? "recovering" : "";
-        return `<div class="row"><span class="${cls}">${escapeHtml(o.name)}</span><span class="muted">${o.status} · xp ${o.xp} · ${o.missions} msn</span></div>`;
+        const nameCell =
+          o.id === editingOperativeId
+            ? `<input class="rename-input" data-op="${escapeHtml(o.id)}" value="${escapeHtml(o.name)}" maxlength="24" />`
+            : `<span class="${cls} rename" data-rename="${escapeHtml(o.id)}" title="rename">${escapeHtml(o.name)}</span>`;
+        return `<div class="row">${nameCell}<span class="muted">${o.status} · xp ${o.xp} · ${o.missions} msn</span></div>`;
       })
       .join("");
 
@@ -239,6 +244,37 @@ async function boot(): Promise<void> {
         const f = btn.dataset.build as FacilityType | undefined;
         if (f) runCampaign({ type: "BuildFacility", facility: f }, `building ${f}`);
       });
+    }
+    for (const span of campaignPanel.querySelectorAll<HTMLElement>("span[data-rename]")) {
+      span.addEventListener("click", () => {
+        editingOperativeId = span.dataset.rename;
+        renderCampaign();
+        const input = campaignPanel.querySelector<HTMLInputElement>("input.rename-input");
+        input?.focus();
+        input?.select();
+      });
+    }
+    const renameInput = campaignPanel.querySelector<HTMLInputElement>("input.rename-input");
+    if (renameInput) {
+      const commit = (): void => {
+        if (editingOperativeId === undefined) return;
+        const id = renameInput.dataset.op;
+        const name = renameInput.value;
+        editingOperativeId = undefined;
+        if (id && name.trim()) {
+          runCampaign({ type: "RenameOperative", operativeId: id, name }, "operative renamed");
+        } else {
+          renderCampaign();
+        }
+      };
+      renameInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") commit();
+        else if (e.key === "Escape") {
+          editingOperativeId = undefined;
+          renderCampaign();
+        }
+      });
+      renameInput.addEventListener("blur", commit);
     }
   }
 

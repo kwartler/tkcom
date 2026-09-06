@@ -82,16 +82,26 @@ export interface HirePersonnelCommand extends BaseCommand {
   readonly count: number;
 }
 
+export interface RenameOperativeCommand extends BaseCommand {
+  readonly type: "RenameOperative";
+  readonly operativeId: string;
+  readonly name: string;
+}
+
 export interface ResolveMissionCommand extends BaseCommand {
   readonly type: "ResolveMission";
   readonly outcome: MissionOutcome;
 }
+
+/** Maximum operative name length; longer names are trimmed. */
+export const MAX_NAME_LENGTH = 24;
 
 export type CampaignCommand =
   | AdvanceToNextEventCommand
   | StartResearchCommand
   | BuildFacilityCommand
   | HirePersonnelCommand
+  | RenameOperativeCommand
   | ResolveMissionCommand;
 
 // -- events --
@@ -137,6 +147,11 @@ export interface OperativeKilledEvent extends BaseEvent {
   readonly type: "OperativeKilled";
   readonly operativeId: string;
 }
+export interface OperativeRenamedEvent extends BaseEvent {
+  readonly type: "OperativeRenamed";
+  readonly operativeId: string;
+  readonly name: string;
+}
 export interface MissionResolvedEvent extends BaseEvent {
   readonly type: "MissionResolved";
   readonly missionId: string;
@@ -170,6 +185,7 @@ export type CampaignEvent =
   | OperativeRecoveredEvent
   | OperativeWoundedEvent
   | OperativeKilledEvent
+  | OperativeRenamedEvent
   | MissionResolvedEvent
   | MonthlyReportEvent
   | CampaignEndedEvent
