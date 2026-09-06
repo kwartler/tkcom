@@ -31,6 +31,7 @@ function soldier(over: Partial<Unit> & Pick<Unit, "id" | "faction" | "position">
     aim: 700,
     armor: 0,
     weaponDamage: 5,
+    reaction: 0,
     ...over,
   };
 }
@@ -210,5 +211,68 @@ describe("victory and determinism", () => {
     expect(hitChancePermille(700, 1)).toBe(700);
     expect(hitChancePermille(700, 6)).toBe(700 - 40 * 5);
     expect(hitChancePermille(700, 100)).toBe(50); // clamped to floor
+  });
+});
+
+describe("line of sight gates fire", () => {
+  it("rejects fire when an opaque object blocks the line", () => {
+    const cells = [];
+    for (let x = 0; x < 6; x++) {
+      const base = { position: { x, y: 0, z: 0 }, floor: "core.tile.floor" };
+      cells.push(x === 2 ? { ...base, object: "core.object.crate" } : base);
+    }
+    const map = parseMapFile({
+      schemaVersion: 1,
+      dimensions: { width: 6, height: 1, levels: 1 },
+      cells,
+      zones: [],
+    });
+    const s = createBattleState({
+      map,
+      units: [
+        soldier({ id: "p1", faction: "player", position: { x: 0, y: 0, z: 0 } }),
+        soldier({ id: "e1", faction: "enemy", position: { x: 4, y: 0, z: 0 } }),
+      ],
+      seed: 1,
+    });
+    const r = applyCommand(s, { type: "FireWeapon", shooterId: "p1", targetId: "e1" });
+    expect(events(r)[0]).toMatchObject({ type: "CommandRejected", reason: "no line of sight" });
+  });
+});
+
+describe("reaction fire", () => {
+  it("an overwatching enemy interrupts a mover in sight and range", () => {
+    const s = createBattleState({
+      map: arena(20, 4),
+      units: [
+        soldier({ id: "p1", faction: "player", position: { x: 0, y: 0, z: 0 } }),
+        soldier({
+          id: "e1",
+          faction: "enemy",
+          position: { x: 6, y: 0, z: 0 },
+          reaction: 1000,
+          aim: 950,
+        }),
+      ],
+      seed: 3,
+    });
+    const r = applyCommand(s, { type: "MoveUnit", unitId: "p1", to: { x: 2, y: 0, z: 0 } });
+    const evts = events(r);
+    expect(evts.some((e) => e.type === "UnitMoved")).toBe(true);
+    expect(evts.some((e) => e.type === "ReactionTriggered")).toBe(true);
+    expect(findUnit(r.state, "e1")?.actionPoints).toBe(12 - FIRE_AP_COST);
+  });
+
+  it("does not react when the mover is out of weapon range", () => {
+    const s = createBattleState({
+      map: arena(30, 4),
+      units: [
+        soldier({ id: "p1", faction: "player", position: { x: 0, y: 0, z: 0 } }),
+        soldier({ id: "e1", faction: "enemy", position: { x: 25, y: 0, z: 0 }, reaction: 1000 }),
+      ],
+      seed: 3,
+    });
+    const r = applyCommand(s, { type: "MoveUnit", unitId: "p1", to: { x: 2, y: 0, z: 0 } });
+    expect(events(r).some((e) => e.type === "ReactionTriggered")).toBe(false);
   });
 });

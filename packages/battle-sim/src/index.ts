@@ -31,6 +31,12 @@ export {
 
 export { applyCommand, applyCommands, chebyshev, hitChancePermille } from "./reduce.js";
 
+export { terrainFromMap, keyOf } from "./terrain.js";
+export type { TerrainGrid, Edge } from "./terrain.js";
+export { findPath } from "./pathfind.js";
+export type { Path } from "./pathfind.js";
+export { hasLineOfSight, lineCells } from "./los.js";
+
 export interface CreateBattleOptions {
   readonly map: MapFile;
   readonly units: readonly Unit[];
