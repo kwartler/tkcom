@@ -1,6 +1,43 @@
+import type { MapFile } from "@tkcom/map-schema";
 import type { SaveEnvelope } from "@tkcom/sim-core";
 import { describe, expect, it, vi } from "vitest";
-import { AutosaveController, InMemorySaveRepository } from "./index";
+import { AutosaveController, InMemoryMapRepository, InMemorySaveRepository } from "./index";
+
+const sampleMap: MapFile = {
+  schemaVersion: 1,
+  dimensions: { width: 2, height: 1, levels: 1 },
+  cells: [
+    { position: { x: 0, y: 0, z: 0 }, floor: "core.tile.floor" },
+    { position: { x: 1, y: 0, z: 0 }, floor: "core.tile.floor" },
+  ],
+  zones: [],
+};
+
+describe("map repository", () => {
+  it("stores, lists, gets, and deletes named maps", async () => {
+    const repo = new InMemoryMapRepository();
+    await repo.put({
+      id: "m1",
+      name: "Bravo",
+      map: sampleMap,
+      updatedAt: "2026-09-06T00:00:00.000Z",
+    });
+    await repo.put({
+      id: "m2",
+      name: "Alpha",
+      map: sampleMap,
+      updatedAt: "2026-09-06T00:00:00.000Z",
+    });
+
+    const list = await repo.list();
+    expect(list.map((s) => s.name)).toEqual(["Alpha", "Bravo"]); // sorted by name
+    expect((await repo.get("m1"))?.map.dimensions.width).toBe(2);
+
+    await repo.delete("m1");
+    expect(await repo.get("m1")).toBeUndefined();
+    expect(await repo.list()).toHaveLength(1);
+  });
+});
 
 function envelope<T>(saveId: string, payload: T): SaveEnvelope<T> {
   return {

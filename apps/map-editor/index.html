@@ -78,6 +78,10 @@
         opacity: 0.4;
         cursor: default;
       }
+      #lib-name,
+      #lib-select {
+        width: 210px;
+      }
       input {
         width: 44px;
         background: #0b0f0b;
@@ -162,6 +166,12 @@
           <button id="export" type="button">export to box</button>
           <button id="import" type="button">import from box</button>
           <textarea id="io" spellcheck="false" placeholder="map JSON"></textarea>
+          <h2>Map library</h2>
+          <div><input id="lib-name" type="text" placeholder="map name" /></div>
+          <button id="lib-save" type="button">save to library</button>
+          <div><select id="lib-select"></select></div>
+          <button id="lib-load" type="button">load selected</button>
+          <button id="lib-delete" type="button">delete selected</button>
           <div id="status"></div>
         </div>
       </div>

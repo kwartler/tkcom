@@ -6,6 +6,15 @@ export {
   type IndexedDbSaveRepositoryOptions,
 } from "./indexed-db";
 export { AutosaveController, type AutosaveControllerOptions } from "./autosave";
+export {
+  type MapRepository,
+  type MapRecord,
+  type MapSummary,
+  InMemoryMapRepository,
+  IndexedDbMapRepository,
+  type IndexedDbMapRepositoryOptions,
+  createMapRepository,
+} from "./map-repository";
 
 import { IndexedDbSaveRepository } from "./indexed-db";
 import { InMemorySaveRepository } from "./memory";

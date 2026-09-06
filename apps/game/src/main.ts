@@ -34,7 +34,12 @@ import {
 } from "@tkcom/campaign-sim";
 import type { GridPosition } from "@tkcom/map-schema";
 import { PixiRenderer } from "@tkcom/renderer";
-import { AutosaveController, createSaveRepository } from "@tkcom/storage";
+import {
+  AutosaveController,
+  type MapRecord,
+  createMapRepository,
+  createSaveRepository,
+} from "@tkcom/storage";
 import { InputManager } from "./input/InputManager";
 import { type DeployedMission, deployMission, toMissionOutcome } from "./mission";
 
@@ -89,6 +94,7 @@ async function boot(): Promise<void> {
   const campaignPanel: HTMLElement = campaignEl;
 
   const repository = createSaveRepository();
+  const mapRepo = createMapRepository();
   const autosave = new AutosaveController<CampaignState>(repository, {
     saveId: AUTOSAVE_ID,
     schemaVersion: CAMPAIGN_SCHEMA_VERSION,
@@ -226,7 +232,7 @@ async function boot(): Promise<void> {
         ${result}
       </div>`;
 
-    el("launch")?.addEventListener("click", () => startMission());
+    el("launch")?.addEventListener("click", () => void startMission());
     el("advance")?.addEventListener("click", () =>
       runCampaign({ type: "AdvanceToNextEvent" }, "time advanced"),
     );
@@ -335,10 +341,18 @@ async function boot(): Promise<void> {
     }
   }
 
-  function startMission(): void {
+  const pickLibraryMap = async (seed: number): Promise<MapRecord | undefined> => {
+    const summaries = await mapRepo.list();
+    if (summaries.length === 0) return undefined;
+    const chosen = summaries[seed % summaries.length];
+    return chosen ? mapRepo.get(chosen.id) : undefined;
+  };
+
+  async function startMission(): Promise<void> {
     if (!isOngoing(campaign)) return;
     const seed = campaign.clock + currentDay(campaign) * 7 + 1;
-    deployed = deployMission(campaign, seed);
+    const record = await pickLibraryMap(seed);
+    deployed = deployMission(campaign, seed, record?.map);
     battle = deployed.battle;
     selectedUnitId = undefined;
     mode = "battle";
@@ -348,7 +362,7 @@ async function boot(): Promise<void> {
     renderer.setActiveLevel(0);
     centerCamera();
     redrawBattle();
-    setStatus("your turn");
+    setStatus(record ? `your turn: ${record.name}` : "your turn");
   }
 
   function finishMission(): void {
@@ -431,6 +445,7 @@ async function boot(): Promise<void> {
     renderer,
     campaign: () => campaign,
     battle: () => battle,
+    mapRepo,
     env: import.meta.env,
   };
 }
