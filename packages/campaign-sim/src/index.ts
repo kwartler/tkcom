@@ -1,28 +1,45 @@
 /**
  * @tkcom/campaign-sim (Lane A)
  *
- * Deterministic campaign layer: integer game-minute clock and a scheduled
- * event queue (IMPLEMENTATION_PLAN.md Sections 6.3 and 9). Built out in
- * Milestone 6. This file establishes the package seam.
+ * Deterministic campaign layer: a game-minute clock with a scheduled event
+ * queue, a persistent roster, resources, research, and a link back from the
+ * tactical layer (ResolveMission). Framework-independent and headless; the
+ * renderer and app read this state, they do not live here. Does not import
+ * battle-sim: the app maps a finished battle into a plain MissionOutcome.
  */
-import type { RngState } from "@tkcom/sim-core";
+export const CAMPAIGN_SCHEMA_VERSION = 1 as const;
 
-/** Discrete campaign time in whole game minutes. */
-export type GameMinutes = number;
+export type {
+  GameMinutes,
+  OperativeStatus,
+  Operative,
+  ResearchProject,
+  ScheduledKind,
+  ScheduledEvent,
+  CampaignOutcome,
+  CampaignState,
+} from "./types.js";
+export {
+  MINUTES_PER_DAY,
+  isOngoing,
+  activeOperatives,
+  livingOperatives,
+  findOperative,
+  researchById,
+} from "./types.js";
 
-export interface ScheduledEvent {
-  readonly id: string;
-  readonly at: GameMinutes;
-  readonly kind: string;
-}
+export type {
+  CampaignCommand,
+  AdvanceToNextEventCommand,
+  StartResearchCommand,
+  ResolveMissionCommand,
+  CampaignEvent,
+  MissionOutcome,
+  OperativeResult,
+} from "./commands.js";
+export { MISSION_REWARD_CREDITS, RECOVERY_DAYS } from "./commands.js";
 
-export interface CampaignState {
-  readonly clock: GameMinutes;
-  /** Kept sorted by `at`; the scheduler pops the earliest. */
-  readonly queue: readonly ScheduledEvent[];
-  readonly rng: RngState;
-}
+export { applyCampaignCommand, applyCampaignCommands } from "./reduce.js";
 
-export function createCampaignState(rng: RngState): CampaignState {
-  return { clock: 0, queue: [], rng };
-}
+export { createCampaign } from "./scenario.js";
+export type { CreateCampaignOptions } from "./scenario.js";
