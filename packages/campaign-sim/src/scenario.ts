@@ -6,10 +6,12 @@
  * monthly economy, and a short scenario length. Original names and content.
  */
 import { createRng } from "@tkcom/sim-core";
+import { RECRUIT_NAMES } from "./commands.js";
 import {
   type CampaignState,
   MINUTES_PER_MONTH,
   type Operative,
+  type RecruitCandidate,
   type ResearchProject,
   type ScheduledEvent,
 } from "./types.js";
@@ -39,7 +41,12 @@ export function createCampaign(options: CreateCampaignOptions): CampaignState {
     missions: 0,
   }));
   const research: ResearchProject[] = STARTER_RESEARCH.map((r) => ({ ...r, completed: false }));
-  const firstTick: ScheduledEvent = { seq: 0, at: MINUTES_PER_MONTH, kind: "MonthlyTick" };
+  // Two starting recruits, ids following the six starters.
+  const recruits: RecruitCandidate[] = [
+    { id: "core.operative.7", name: RECRUIT_NAMES[0] ?? "Ash" },
+    { id: "core.operative.8", name: RECRUIT_NAMES[1] ?? "Bex" },
+  ];
+  const queue: ScheduledEvent[] = [{ seq: 0, at: MINUTES_PER_MONTH, kind: "MonthlyTick" }];
 
   return {
     clock: 0,
@@ -57,8 +64,10 @@ export function createCampaign(options: CreateCampaignOptions): CampaignState {
       detection: 0,
     },
     roster,
+    recruits,
+    nextOperativeSeq: 9,
     research,
-    queue: [firstTick],
+    queue,
     nextSeq: 1,
     scenarioMonths: options.scenarioMonths ?? 3,
     consecutiveNegativeMonths: 0,

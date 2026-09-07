@@ -24,6 +24,7 @@ import {
   type FacilityType,
   HIRE_COST,
   MISSION_REWARD_CREDITS,
+  RECRUIT_COST,
   applyCampaignCommands,
   createCampaign,
   currentDay,
@@ -198,6 +199,15 @@ async function boot(): Promise<void> {
         `<button data-build="${f}" ${ended || c.credits < FACILITY_DEFS[f].buildCost ? "disabled" : ""}>build ${f} (${FACILITY_DEFS[f].buildCost})</button>`,
     ).join(" ");
 
+    const recruits = c.recruits.length
+      ? c.recruits
+          .map(
+            (r) =>
+              `<div class="row"><span>${escapeHtml(r.name)}</span><button data-recruit="${escapeHtml(r.id)}" ${ended || c.credits < RECRUIT_COST || housedPersonnel(c) + 1 > housingCapacity(c) ? "disabled" : ""}>recruit (${RECRUIT_COST})</button></div>`,
+          )
+          .join("")
+      : '<div class="row"><span class="muted">no recruits available</span></div>';
+
     const result = ended
       ? `<div class="panel"><h2>Result</h2><div class="row">${c.outcome.kind === "won" ? "VICTORY" : `DEFEAT: ${c.outcome.kind === "lost" ? escapeHtml(c.outcome.reason) : ""}`}</div></div>`
       : "";
@@ -219,6 +229,7 @@ async function boot(): Promise<void> {
           <span>Lab cap ${labCapacity(c)}</span>
         </div>
         <div class="panel"><h2>Squad</h2>${roster}</div>
+        <div class="panel"><h2>Recruits</h2>${recruits}</div>
         <div class="panel"><h2>Research</h2>${research}</div>
         <div class="panel"><h2>Base</h2>${facilities}
           <div class="bar">${buildButtons}
@@ -249,6 +260,12 @@ async function boot(): Promise<void> {
       btn.addEventListener("click", () => {
         const f = btn.dataset.build as FacilityType | undefined;
         if (f) runCampaign({ type: "BuildFacility", facility: f }, `building ${f}`);
+      });
+    }
+    for (const btn of campaignPanel.querySelectorAll<HTMLButtonElement>("button[data-recruit]")) {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.recruit;
+        if (id) runCampaign({ type: "RecruitOperative", candidateId: id }, "recruit incoming");
       });
     }
     for (const span of campaignPanel.querySelectorAll<HTMLElement>("span[data-rename]")) {

@@ -1,6 +1,6 @@
 import { hashState } from "@tkcom/sim-core";
 import { describe, expect, it } from "vitest";
-import type { CampaignCommand, MissionOutcome } from "./commands.js";
+import { type CampaignCommand, type MissionOutcome, RECRUIT_COST } from "./commands.js";
 import { applyCampaignCommand, applyCampaignCommands, labCapacity } from "./reduce.js";
 import { createCampaign } from "./scenario.js";
 import { type CampaignState, findOperative, isOngoing, researchById } from "./types.js";
@@ -98,6 +98,43 @@ describe("facilities and personnel", () => {
     expect(hired.credits).toBe(2000 - 2 * 150);
     // quarters cap 15; housed = 7 sci + 6 soldiers = 13; hiring 5 more exceeds it
     const r = applyCampaignCommand(hired, { type: "HirePersonnel", role: "scientist", count: 5 });
+    expect((r.events as { type: string }[])[0]).toMatchObject({
+      type: "CommandRejected",
+      reason: "no housing capacity",
+    });
+  });
+});
+
+describe("recruitment", () => {
+  it("hires a recruit who arrives active after the transfer delay", () => {
+    const s0 = createCampaign({ seed: 1 });
+    const cand = s0.recruits[0];
+    if (!cand) throw new Error("expected a starting recruit");
+
+    let s = applyCampaignCommand(s0, { type: "RecruitOperative", candidateId: cand.id }).state;
+    expect(s.credits).toBe(2000 - RECRUIT_COST);
+    expect(s.recruits.some((r) => r.id === cand.id)).toBe(false);
+    expect(findOperative(s, cand.id)?.status).toBe("recovering"); // in transit
+
+    let guard = 0;
+    while (isOngoing(s) && findOperative(s, cand.id)?.status === "recovering" && guard++ < 50) {
+      s = advance(s);
+    }
+    expect(findOperative(s, cand.id)?.status).toBe("active");
+  });
+
+  it("refills the recruit pool over time", () => {
+    const s0 = createCampaign({ seed: 1 });
+    const s1 = advance(s0); // first event is the pool refresh
+    expect(s1.recruits.length).toBeGreaterThan(s0.recruits.length);
+  });
+
+  it("rejects recruiting with no housing", () => {
+    let s = createCampaign({ seed: 1 });
+    s = applyCampaignCommand(s, { type: "HirePersonnel", role: "scientist", count: 4 }).state; // fills housing
+    const cand = s.recruits[0];
+    if (!cand) throw new Error("expected a recruit");
+    const r = applyCampaignCommand(s, { type: "RecruitOperative", candidateId: cand.id });
     expect((r.events as { type: string }[])[0]).toMatchObject({
       type: "CommandRejected",
       reason: "no housing capacity",

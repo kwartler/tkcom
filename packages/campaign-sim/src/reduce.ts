@@ -7,7 +7,7 @@
  * settles monthly (funding scaled by performance, minus salaries and facility
  * maintenance). See docs/design/base-and-campaign.md.
  */
-import type { SimResult } from "@tkcom/sim-core";
+import { type RngState, type SimResult, nextInt } from "@tkcom/sim-core";
 import {
   type CampaignCommand,
   type CampaignEvent,
@@ -19,9 +19,14 @@ import {
   MISSION_REWARD_CREDITS,
   PER_SCIENTIST_RATE,
   RECOVERY_BASE_DAYS,
+  RECRUIT_COST,
+  RECRUIT_NAMES,
+  RECRUIT_POOL_CAP,
+  RECRUIT_REFILL,
   SCIENTIST_SALARY,
   SICKBAY_RECOVERY_FACTOR,
   SOLDIER_SALARY,
+  TRANSFER_DAYS,
 } from "./commands.js";
 import {
   ALL_FACILITIES,
@@ -59,6 +64,28 @@ function recoveryDays(s: CampaignState): number {
   const factor = SICKBAY_RECOVERY_FACTOR ** s.facilities.sickbay;
   return Math.max(1, Math.round(RECOVERY_BASE_DAYS * factor));
 }
+/** Top up the recruit pool toward its cap, up to RECRUIT_REFILL per call.
+ * Deterministic: names are drawn from the state's RNG. */
+function refillRecruits(
+  s: CampaignState,
+): Pick<CampaignState, "rng" | "recruits" | "nextOperativeSeq"> {
+  let rng: RngState = s.rng;
+  let recruits = s.recruits;
+  let seq = s.nextOperativeSeq;
+  let added = 0;
+  while (recruits.length < RECRUIT_POOL_CAP && added < RECRUIT_REFILL) {
+    const [idx, rngNext] = nextInt(rng, 0, RECRUIT_NAMES.length);
+    rng = rngNext;
+    recruits = [
+      ...recruits,
+      { id: `core.operative.${seq}`, name: RECRUIT_NAMES[idx] ?? "Recruit" },
+    ];
+    seq += 1;
+    added += 1;
+  }
+  return { rng, recruits, nextOperativeSeq: seq };
+}
+
 function maintenance(s: CampaignState): number {
   let total = 0;
   for (const f of ALL_FACILITIES) total += s.facilities[f] * FACILITY_DEFS[f].maintenance;
@@ -173,6 +200,7 @@ function advanceToNextEvent(state: CampaignState): SimResult<CampaignState> {
       );
       s = {
         ...s,
+        ...refillRecruits(s),
         credits: s.credits + net,
         month: s.month + 1,
         consecutiveNegativeMonths: net < 0 ? s.consecutiveNegativeMonths + 1 : 0,
@@ -285,6 +313,40 @@ function renameOperative(
   return { state: s, events };
 }
 
+function recruitOperative(
+  state: CampaignState,
+  command: CampaignCommand & { type: "RecruitOperative" },
+): SimResult<CampaignState> {
+  const candidate = state.recruits.find((r) => r.id === command.candidateId);
+  if (!candidate) return reject(state, command, "no such recruit");
+  if (state.credits < RECRUIT_COST) return reject(state, command, "insufficient credits");
+  if (housedPersonnel(state) + 1 > housingCapacity(state)) {
+    return reject(state, command, "no housing capacity");
+  }
+  const arrivesAt = state.clock + TRANSFER_DAYS * MINUTES_PER_DAY;
+  const operative: Operative = {
+    id: candidate.id,
+    name: candidate.name,
+    status: "recovering",
+    xp: 0,
+    missions: 0,
+    recoveryUntil: arrivesAt,
+  };
+  const sched = scheduleEvent(state, arrivesAt, "OperativeRecovered", candidate.id);
+  const s: CampaignState = {
+    ...state,
+    credits: state.credits - RECRUIT_COST,
+    roster: [...state.roster, operative],
+    recruits: state.recruits.filter((r) => r.id !== candidate.id),
+    queue: sched.queue,
+    nextSeq: sched.nextSeq,
+  };
+  const events: CampaignEvent[] = [
+    { type: "OperativeRecruited", operativeId: candidate.id, name: candidate.name, arrivesAt },
+  ];
+  return { state: s, events };
+}
+
 function resolveMission(
   state: CampaignState,
   command: CampaignCommand & { type: "ResolveMission" },
@@ -357,6 +419,8 @@ export function applyCampaignCommand(
       return hirePersonnel(state, command);
     case "RenameOperative":
       return renameOperative(state, command);
+    case "RecruitOperative":
+      return recruitOperative(state, command);
     case "ResolveMission":
       return resolveMission(state, command);
   }
