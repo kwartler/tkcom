@@ -242,6 +242,15 @@ async function boot(): Promise<void> {
   byId("zoom-in")?.addEventListener("click", () => renderer.zoomBy(1.15, undefined));
   byId("zoom-out")?.addEventListener("click", () => renderer.zoomBy(1 / 1.15, undefined));
   byId("recenter")?.addEventListener("click", () => fitCamera());
+  byId("rotate")?.addEventListener("click", () => {
+    editor.rotate();
+    level = Math.min(level, editor.doc.dimensions.levels - 1);
+    fitCamera();
+    scheduleRender();
+    updateButtons();
+    autosave.schedule(editor.toMapFile());
+    setStatus("rotated 90 CW");
+  });
 
   const readDim = (id: string, fallback: number): number => {
     const input = byId(id);

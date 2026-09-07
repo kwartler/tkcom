@@ -328,6 +328,11 @@ export class MapEditor {
     });
   }
 
+  /** Rotate the whole map 90 degrees clockwise (undoable). */
+  rotate(): void {
+    this.commit("Rotate 90 CW", (d) => rotateDocumentCW(d));
+  }
+
   /** Export the current editor state to a frozen `MapFile`. */
   toMapFile(): MapFile {
     return documentToMapFile(this.document);
@@ -362,6 +367,45 @@ export class MapEditor {
  */
 export function createEmptyDocument(dimensions: Dimensions): MapDocument {
   return { dimensions: Object.freeze({ ...dimensions }), cells: new Map(), zones: [] };
+}
+
+const ROTATE_EDGE_CW: Readonly<Record<WallEdge, WallEdge>> = {
+  north: "east",
+  east: "south",
+  south: "west",
+  west: "north",
+};
+
+/**
+ * Rotate a document 90 degrees clockwise: swap the width/height, remap every
+ * cell (x, y) -> (height - 1 - y, x), rotate wall edges N->E->S->W, and rotate
+ * zone cells the same way. Elevation (z) is unchanged. Pure.
+ */
+export function rotateDocumentCW(doc: MapDocument): MapDocument {
+  const { width, height, levels } = doc.dimensions;
+  const rot = (x: number, y: number): { x: number; y: number } => ({ x: height - 1 - y, y: x });
+
+  const cells = new Map<string, Cell>();
+  for (const cell of doc.cells.values()) {
+    const { x, y, z } = cell.position;
+    const np = rot(x, y);
+    const rotated: Cell = {
+      ...cell,
+      position: { x: np.x, y: np.y, z },
+      walls: cell.walls?.map((wall) => ({ ...wall, edge: ROTATE_EDGE_CW[wall.edge] })),
+    };
+    cells.set(cellKey(np.x, np.y, z), rotated);
+  }
+
+  const zones = doc.zones.map((zone) => ({
+    ...zone,
+    cells: zone.cells.map((c) => {
+      const np = rot(c.x, c.y);
+      return { x: np.x, y: np.y, z: c.z };
+    }),
+  }));
+
+  return { dimensions: Object.freeze({ width: height, height: width, levels }), cells, zones };
 }
 
 /** Deep-clone a document so future edits never share mutable state. */
