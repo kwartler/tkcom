@@ -79,8 +79,15 @@
         cursor: default;
       }
       #lib-name,
-      #lib-select {
+      #lib-select,
+      #terrain-name,
+      #terrain-file {
         width: 210px;
+      }
+      #terrain-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
       }
       input {
         width: 44px;
@@ -163,9 +170,11 @@
             z <input id="new-z" type="number" value="1" min="1" max="8" />
           </div>
           <button id="new-map" type="button">new floor map</button>
-          <h2>Tile image</h2>
-          <div><input id="upload-tile" type="file" accept="image/*" /></div>
-          <button id="clear-tile" type="button">clear tile image</button>
+          <h2>Terrain</h2>
+          <div id="terrain-list"></div>
+          <div>name <input id="terrain-name" type="text" placeholder="new terrain" /></div>
+          <div><input id="terrain-file" type="file" accept="image/*" /></div>
+          <button id="terrain-add" type="button">add terrain</button>
           <h2>Validate</h2>
           <button id="validate" type="button">validate map</button>
           <div id="validation"></div>

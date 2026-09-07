@@ -23,6 +23,7 @@ export {
 export type {
   Cell,
   ContentId,
+  CustomTile,
   Dimensions,
   GridCoord,
   GridPosition,

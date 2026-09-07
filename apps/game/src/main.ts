@@ -375,6 +375,15 @@ async function boot(): Promise<void> {
     mode = "battle";
     campaignPanel.hidden = true;
     hudEl.hidden = false;
+    // Bind any custom terrain the authored map carries (FR-7) before drawing, so
+    // player-made tiles show in the mission; clear stale sprites from a prior map.
+    await renderer.clearSprites();
+    const palette = battle.map.tilePalette;
+    if (palette && palette.length > 0) {
+      const tiles: Record<string, string> = {};
+      for (const t of palette) tiles[t.id] = t.image;
+      await renderer.setSprites({ tiles });
+    }
     renderer.loadMap(battle.map);
     renderer.setActiveLevel(0);
     centerCamera();

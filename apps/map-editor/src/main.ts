@@ -8,6 +8,7 @@
  * frozen map schema through the engine.
  */
 import {
+  type CustomTile,
   DEFAULT_WALL,
   type GridCoord,
   MapEditor,
@@ -23,6 +24,8 @@ import { AutosaveController, createMapRepository, createSaveRepository } from "@
 const DRAFT_ID = "editor.draft.v1";
 const ENGINE_VERSION = "0.1.0";
 const OBJECT_TILE = "core.obj.crate";
+const DEFAULT_FLOOR_ID = "core.tile.floor-concrete";
+const MAX_TILE_BYTES = 2_000_000;
 
 type Tool = "floor" | "wall" | "object" | "zone" | "erase";
 
@@ -48,6 +51,9 @@ async function boot(): Promise<void> {
   let edge: WallEdge = "north";
   let zoneKind: ZoneKind = "player-spawn";
   let level = 0;
+  // Which floor id the floor tool paints: the built-in concrete, or a custom
+  // terrain the player added (FR-7).
+  let activeFloorId = DEFAULT_FLOOR_ID;
 
   const renderer = new PixiRenderer({ parent: mount });
   await renderer.init();
@@ -103,7 +109,7 @@ async function boot(): Promise<void> {
     const cell = editor.doc.cells.get(key);
     switch (tool) {
       case "floor":
-        editor.setFloor(pos, "core.tile.floor-concrete");
+        editor.setFloor(pos, activeFloorId);
         break;
       case "wall":
         editor.toggleWall(pos, edge, DEFAULT_WALL);
@@ -210,6 +216,129 @@ async function boot(): Promise<void> {
       selectGroup("button[data-zone]", b);
     });
   }
+  // ---- terrain palette (FR-7) ----
+  const paletteList = byId("terrain-list");
+
+  const slugify = (name: string): string =>
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "tile";
+
+  const uniqueTerrainId = (name: string): string => {
+    const base = `user.tile.${slugify(name)}`;
+    const taken = new Set(editor.tilePalette.map((t) => t.id));
+    if (!taken.has(base)) return base;
+    let n = 2;
+    while (taken.has(`${base}-${n}`)) n += 1;
+    return `${base}-${n}`;
+  };
+
+  // Rebind the current map's custom terrain images so they draw as textures.
+  async function bindPalette(): Promise<void> {
+    await renderer.clearSprites();
+    const tiles: Record<string, string> = {};
+    for (const t of editor.tilePalette) tiles[t.id] = t.image;
+    if (Object.keys(tiles).length > 0) await renderer.setSprites({ tiles });
+    scheduleRender();
+  }
+
+  function renderPalette(): void {
+    if (!paletteList) return;
+    paletteList.replaceChildren();
+    const entries: Array<{ id: string; name: string; custom: boolean }> = [
+      { id: DEFAULT_FLOOR_ID, name: "concrete", custom: false },
+      ...editor.tilePalette.map((t) => ({ id: t.id, name: t.name, custom: true })),
+    ];
+    for (const e of entries) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = e.name;
+      if (e.id === activeFloorId) btn.classList.add("active");
+      btn.addEventListener("click", () => selectTerrain(e.id));
+      paletteList.appendChild(btn);
+      if (e.custom) {
+        const del = document.createElement("button");
+        del.type = "button";
+        del.textContent = "x";
+        del.title = `remove ${e.name}`;
+        del.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          removeTerrain(e.id);
+        });
+        paletteList.appendChild(del);
+      }
+    }
+  }
+
+  function selectTerrain(id: string): void {
+    activeFloorId = id;
+    tool = "floor";
+    const floorBtn = document.querySelector<HTMLButtonElement>('button[data-tool="floor"]');
+    if (floorBtn) selectGroup("button[data-tool]", floorBtn);
+    renderPalette();
+  }
+
+  // Rebind sprites and rebuild the palette UI after any map load; drop a stale
+  // active brush if the loaded map does not carry it.
+  async function syncPalette(): Promise<void> {
+    const ids = new Set(editor.tilePalette.map((t) => t.id));
+    if (activeFloorId !== DEFAULT_FLOOR_ID && !ids.has(activeFloorId)) {
+      activeFloorId = DEFAULT_FLOOR_ID;
+    }
+    renderPalette();
+    await bindPalette();
+  }
+
+  function removeTerrain(id: string): void {
+    editor.setTilePalette(editor.tilePalette.filter((t) => t.id !== id));
+    void syncPalette();
+    autosave.schedule(editor.toMapFile());
+    updateButtons();
+    setStatus("terrain removed");
+  }
+
+  function addTerrain(name: string, image: string): void {
+    const tile: CustomTile = { id: uniqueTerrainId(name), name: name.slice(0, 60), image };
+    editor.setTilePalette([...editor.tilePalette, tile]);
+    void bindPalette().then(() => selectTerrain(tile.id));
+    autosave.schedule(editor.toMapFile());
+    updateButtons();
+    setStatus(`added terrain "${tile.name}"`);
+  }
+
+  byId("terrain-add")?.addEventListener("click", () => {
+    const nameEl = byId("terrain-name");
+    const fileEl = byId("terrain-file");
+    const name = nameEl instanceof HTMLInputElement ? nameEl.value.trim() : "";
+    const file = fileEl instanceof HTMLInputElement ? fileEl.files?.[0] : undefined;
+    if (!name) {
+      setStatus("name the terrain first");
+      return;
+    }
+    if (!file) {
+      setStatus("choose an image file");
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      setStatus("not an image file");
+      return;
+    }
+    if (file.size > MAX_TILE_BYTES) {
+      setStatus("image too large (2MB max)");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const src = typeof reader.result === "string" ? reader.result : "";
+      if (!src) return;
+      addTerrain(name, src);
+      if (nameEl instanceof HTMLInputElement) nameEl.value = "";
+      if (fileEl instanceof HTMLInputElement) fileEl.value = "";
+    };
+    reader.readAsDataURL(file);
+  });
+
   byId("clear-zones")?.addEventListener("click", () => {
     for (const id of editor.doc.zones.map((z) => z.id)) editor.removeZone(id);
     scheduleRender();
@@ -263,6 +392,7 @@ async function boot(): Promise<void> {
     const levels = Math.min(8, readDim("new-z", 1));
     editor = new MapEditor(buildFloorMap({ width, height, levels }));
     level = 0;
+    void syncPalette();
     fitCamera();
     scheduleRender();
     updateButtons();
@@ -304,6 +434,7 @@ async function boot(): Promise<void> {
       const map = parseMapFile(JSON.parse(io.value));
       editor = new MapEditor(map);
       level = 0;
+      void syncPalette();
       fitCamera();
       scheduleRender();
       updateButtons();
@@ -312,38 +443,6 @@ async function boot(): Promise<void> {
     } catch (e) {
       setStatus(`import failed: ${e instanceof Error ? e.message : String(e)}`);
     }
-  });
-
-  const uploadInput = byId("upload-tile");
-  if (uploadInput instanceof HTMLInputElement) {
-    uploadInput.addEventListener("change", () => {
-      const file = uploadInput.files?.[0];
-      if (!file) return;
-      if (!file.type.startsWith("image/")) {
-        setStatus("not an image file");
-        return;
-      }
-      if (file.size > 2_000_000) {
-        setStatus("image too large (2MB max)");
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = () => {
-        const src = typeof reader.result === "string" ? reader.result : "";
-        if (!src) return;
-        void renderer.setSprites({ tiles: { "core.tile.floor-concrete": src } }).then(() => {
-          scheduleRender();
-          setStatus("floor tile image applied");
-        });
-      };
-      reader.readAsDataURL(file);
-    });
-  }
-  byId("clear-tile")?.addEventListener("click", () => {
-    void renderer.clearSprites().then(() => {
-      scheduleRender();
-      setStatus("tile image cleared");
-    });
   });
 
   // ---- map library ----
@@ -377,6 +476,7 @@ async function boot(): Promise<void> {
       }
       editor = new MapEditor(record.map);
       level = 0;
+      void syncPalette();
       fitCamera();
       scheduleRender();
       updateButtons();
@@ -396,12 +496,21 @@ async function boot(): Promise<void> {
 
   fitCamera();
   updateButtons();
+  await syncPalette();
   if (!saved) await autosave.saveNow(editor.toMapFile());
   setStatus(saved ? `draft resumed (r${saved.revision})` : "new draft");
   requestAnimationFrame(() => void renderLoop());
 
   // Debug hook for verification and tooling.
-  (window as unknown as { __EDITOR: unknown }).__EDITOR = { renderer };
+  (window as unknown as { __EDITOR: unknown }).__EDITOR = {
+    renderer,
+    get editor() {
+      return editor;
+    },
+    get activeFloorId() {
+      return activeFloorId;
+    },
+  };
 }
 
 if (document.readyState === "loading") {

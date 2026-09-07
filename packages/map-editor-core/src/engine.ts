@@ -20,12 +20,12 @@
  * edits without hand-written inverse functions.
  */
 
-import type { Cell, Dimensions, GridPosition, MapFile, Zone } from "@tkcom/map-schema";
+import type { Cell, CustomTile, Dimensions, GridPosition, MapFile, Zone } from "@tkcom/map-schema";
 
 /** Matches the frozen `MAP_SCHEMA_VERSION` constant; editors emit maps at v1. */
 export const MAP_SCHEMA_VERSION = 1 as const;
 
-export type { Cell, Dimensions, GridPosition, MapFile, Zone };
+export type { Cell, CustomTile, Dimensions, GridPosition, MapFile, Zone };
 
 /** A wall-edge direction, derived from the schema-backed `Cell` type. */
 export type WallEdge = NonNullable<NonNullable<Cell["walls"]>[number]>["edge"];
@@ -59,6 +59,9 @@ export interface MapDocument {
   /** Hit-test by "x,y,z". */
   readonly cells: ReadonlyMap<string, Cell>;
   readonly zones: readonly Zone[];
+  /** Player-authored terrain types embedded with the map (FR-7). Not spatial;
+   * carried through edits untouched. */
+  readonly tilePalette?: readonly CustomTile[];
 }
 
 export interface EditorOptions {
@@ -101,6 +104,7 @@ function documentFromMapFile(map: MapFile): MapDocument {
     dimensions: Object.freeze({ ...map.dimensions }),
     cells,
     zones: [...map.zones],
+    tilePalette: map.tilePalette,
   };
 }
 
@@ -121,6 +125,7 @@ export function documentToMapFile(doc: MapDocument): MapFile {
     dimensions: { ...doc.dimensions },
     cells,
     zones: doc.zones.map((z) => ({ ...z, cells: z.cells.map((c) => ({ ...c })) })),
+    tilePalette: doc.tilePalette?.map((t) => ({ ...t })),
   };
 }
 
@@ -135,7 +140,7 @@ function getCell(doc: MapDocument, pos: GridCoord): Readonly<Cell> | undefined {
 function withCell(doc: MapDocument, pos: GridCoord, cell: Cell): MapDocument {
   const cells = new Map(doc.cells);
   cells.set(cellKey(pos.x, pos.y, pos.z), cell);
-  return { dimensions: doc.dimensions, cells, zones: doc.zones };
+  return { ...doc, cells };
 }
 
 /**
@@ -291,16 +296,14 @@ export class MapEditor {
 
   addZone(zone: Zone): void {
     this.commit(`Add zone ${zone.id}`, (d) => ({
-      dimensions: d.dimensions,
-      cells: d.cells,
+      ...d,
       zones: [...d.zones, { ...zone, cells: zone.cells.map((c) => ({ ...c })) }],
     }));
   }
 
   removeZone(id: string): void {
     this.commit(`Remove zone ${id}`, (d) => ({
-      dimensions: d.dimensions,
-      cells: d.cells,
+      ...d,
       zones: d.zones.filter((z) => z.id !== id),
     }));
   }
@@ -321,8 +324,7 @@ export class MapEditor {
         }
       }
       return {
-        dimensions: d.dimensions,
-        cells: d.cells,
+        ...d,
         zones: d.zones.map((z) => (z.id === id ? { ...z, cells: merged } : z)),
       };
     });
@@ -331,6 +333,17 @@ export class MapEditor {
   /** Rotate the whole map 90 degrees clockwise (undoable). */
   rotate(): void {
     this.commit("Rotate 90 CW", (d) => rotateDocumentCW(d));
+  }
+
+  /** The map's custom terrain palette (FR-7), empty when none. */
+  get tilePalette(): readonly CustomTile[] {
+    return this.document.tilePalette ?? [];
+  }
+
+  /** Replace the custom terrain palette (undoable). Adding, replacing, or
+   * removing a terrain type all go through here. */
+  setTilePalette(tiles: readonly CustomTile[]): void {
+    this.commit("Set tile palette", (d) => ({ ...d, tilePalette: tiles.map((t) => ({ ...t })) }));
   }
 
   /** Export the current editor state to a frozen `MapFile`. */
@@ -405,7 +418,12 @@ export function rotateDocumentCW(doc: MapDocument): MapDocument {
     }),
   }));
 
-  return { dimensions: Object.freeze({ width: height, height: width, levels }), cells, zones };
+  return {
+    ...doc,
+    dimensions: Object.freeze({ width: height, height: width, levels }),
+    cells,
+    zones,
+  };
 }
 
 /** Deep-clone a document so future edits never share mutable state. */
@@ -413,9 +431,11 @@ export function cloneDocument(doc: MapDocument): MapDocument {
   const cells = new Map<string, Cell>();
   for (const [k, cell] of doc.cells) cells.set(k, cloneCell(cell));
   return {
+    ...doc,
     dimensions: Object.freeze({ ...doc.dimensions }),
     cells,
     zones: doc.zones.map((z) => ({ ...z, cells: z.cells.map((c) => ({ ...c })) })),
+    tilePalette: doc.tilePalette?.map((t) => ({ ...t })),
   };
 }
 
