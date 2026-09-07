@@ -115,6 +115,59 @@ one-image-per-tile experience with no frame-map authoring on the player's side.
 
 **Lands in:** editor + game (file import/export, schema-validated); optional sync worker (community repository).
 
+## FR-7: Upload a new custom terrain (not just re-skin one)
+
+**Request:** a user uploads an image and it becomes a **new terrain type** they can
+paint with, for example a new floor terrain, that persists and travels with the map.
+
+**Feasibility:** Yes. The sprite path and a validated upload already exist; this
+turns the current proof-of-concept into a real palette feature.
+
+**What exists today (the gap):** the editor upload at
+[`apps/map-editor/src/main.ts`](../../apps/map-editor/src/main.ts) binds any
+uploaded image to **one hardcoded id** (`core.tile.floor-concrete`) in the live
+renderer only. So a user can re-skin the concrete floor, but cannot add a *new*
+named terrain, cannot choose which tile the upload targets, and loses the image on
+reload (it is never persisted into the map or its export). Related plumbing that is
+already done: `renderer.setSprites` / `clearSprites` (the sprite path), the 2 MB +
+`image/*` type checks, `ContentId` ids, and the map library.
+
+**Scope:**
+- **Palette model (editor):** a runtime list of custom terrain types, each with a
+  generated `ContentId` (for example `user.tile.<slug>`), a display name, and its
+  image (data URI). New types appear in the tile palette as selectable brushes and
+  paint through the existing `setFloor` path (custom ids paint like any floor id).
+- **Upload flow (editor UI):** a "New terrain" action: name it, pick an image, it
+  is validated (existing type + 2 MB checks, plus a max-dimension cap), registered
+  in the palette, bound via `setSprites({ tiles: { [id]: dataUri } })`, and becomes
+  the active brush. Uploading to an existing custom type replaces its image.
+- **Persistence (schema):** custom terrain must survive reload and travel with the
+  map. Add an **additive, optional** field to `MapFileSchema`
+  ([`packages/map-schema`](../../packages/map-schema)), for example
+  `tilePalette?: Array<{ id, name, image }>`, so existing v1 maps stay valid (no
+  version bump needed for an optional field; bump to v2 only if it becomes
+  required). The editor writes the palette on save/export and the loader rebinds it
+  via `setSprites` on open, in both the editor and the game. This is the bundling
+  side of FR-6 (custom images are the map bundle's assets).
+- **Game side:** when a map with a `tilePalette` loads, the game binds those
+  sprites before rendering so custom terrain shows in missions, not just the editor.
+
+**Caveats / safety:**
+- Uploaded images are **untrusted input** (see FR-4 / FR-6): enforce type, byte
+  size, and pixel-dimension caps; they are only ever drawn as a texture, never
+  executed. An imported map's `tilePalette` must be schema-validated and size-capped
+  like any other imported content before its images are bound.
+- Data URIs inflate map JSON quickly; cap the number of custom tiles and their
+  size, and prefer WebP. A zip `.tkmap` bundle (FR-6, plan Section 8.4) is the
+  longer-term home for the image bytes so the JSON stays small.
+- Custom ids are namespaced (`user.tile.*`) to never collide with `core.*` content.
+
+**Lands in:** Lane B (editor palette UI + upload), map-schema (additive palette
+field), renderer (already has the sprite path), and the game loader (rebind on
+open). Best built alongside or just after FR-6 file import/export, since both share
+the "images travel with the map" bundling. Buildable now as an editor-plus-schema
+slice; the persistent bundle format can follow.
+
 ## Cross-references
 
 - Research refinements (head-of-research confirmation dialog, on-device model options) are in [`dynamic-research.md`](dynamic-research.md).
