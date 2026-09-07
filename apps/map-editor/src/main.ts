@@ -13,6 +13,7 @@ import {
   MapEditor,
   type MapFile,
   type WallEdge,
+  type ZoneKind,
   buildFloorMap,
 } from "@tkcom/map-editor-core";
 import { MAP_SCHEMA_VERSION, parseMapFile } from "@tkcom/map-schema";
@@ -23,7 +24,7 @@ const DRAFT_ID = "editor.draft.v1";
 const ENGINE_VERSION = "0.1.0";
 const OBJECT_TILE = "core.obj.crate";
 
-type Tool = "floor" | "wall" | "object" | "erase";
+type Tool = "floor" | "wall" | "object" | "zone" | "erase";
 
 const byId = (id: string): HTMLElement | null => document.getElementById(id);
 
@@ -45,6 +46,7 @@ async function boot(): Promise<void> {
   let editor = new MapEditor(saved?.payload ?? buildFloorMap({ width: 10, height: 10, levels: 1 }));
   let tool: Tool = "floor";
   let edge: WallEdge = "north";
+  let zoneKind: ZoneKind = "player-spawn";
   let level = 0;
 
   const renderer = new PixiRenderer({ parent: mount });
@@ -109,6 +111,15 @@ async function boot(): Promise<void> {
       case "object":
         editor.setObject(pos, OBJECT_TILE);
         break;
+      case "zone": {
+        const zoneId = `core.zone.${zoneKind}`;
+        if (editor.doc.zones.some((z) => z.id === zoneId)) {
+          editor.addZoneCells(zoneId, [pos]);
+        } else {
+          editor.addZone({ id: zoneId, kind: zoneKind, cells: [pos] });
+        }
+        break;
+      }
       case "erase":
         if (cell?.walls)
           for (const w of [...cell.walls]) editor.toggleWall(pos, w.edge, DEFAULT_WALL);
@@ -132,7 +143,7 @@ async function boot(): Promise<void> {
     const pos = renderer.pickGrid({ sx: offsetX, sy: offsetY }, level);
     if (!editor.inBounds({ ...pos, z: level })) return;
     const target: GridCoord = { x: pos.x, y: pos.y, z: level };
-    const key = `${target.x},${target.y},${target.z}:${tool}:${edge}`;
+    const key = `${target.x},${target.y},${target.z}:${tool}:${edge}:${zoneKind}`;
     if (key === lastPaintKey) return;
     lastPaintKey = key;
     applyTool(target);
@@ -192,6 +203,20 @@ async function boot(): Promise<void> {
       selectGroup("button[data-edge]", b);
     });
   }
+  for (const b of document.querySelectorAll<HTMLButtonElement>("button[data-zone]")) {
+    b.addEventListener("click", () => {
+      const zk = b.dataset.zone;
+      if (zk) zoneKind = zk as ZoneKind;
+      selectGroup("button[data-zone]", b);
+    });
+  }
+  byId("clear-zones")?.addEventListener("click", () => {
+    for (const id of editor.doc.zones.map((z) => z.id)) editor.removeZone(id);
+    scheduleRender();
+    updateButtons();
+    autosave.schedule(editor.toMapFile());
+    setStatus("zones cleared");
+  });
   byId("undo")?.addEventListener("click", () => {
     editor.undo();
     scheduleRender();

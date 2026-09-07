@@ -81,6 +81,31 @@
 
 ---
 
+## FR-5: Rotate a battle map
+
+**Request:** the user can rotate a battle map.
+
+**Feasibility:** Yes. Two distinct things, both worth having:
+
+- **Rotate the map content (editor op).** A 90-degree transform of a `MapDocument`: remap each cell position (for clockwise, `(x, y) -> (height - 1 - y, x)`), rotate wall edges (north to east to south to west), and rotate zone cells the same way; z is unchanged. Best as an undoable `rotate()` in `@tkcom/map-editor-core`, with a toolbar button. Useful in its own right and a prerequisite for rotating authored blocks during procedural assembly (plan Section 8.5).
+- **Rotate the view (renderer op).** Four isometric orientations by rotating the projection and its inverse (so picking still works). Moderate: the projection math and `pickGridCell` both need the orientation. Purely visual; no schema change.
+
+**Lands in:** map-editor-core + editor UI (content rotation); renderer + projection (view rotation). Independent; content rotation is the simpler first step.
+
+## FR-6: Import / export maps as files, for community sharing
+
+**Request:** let users import and export a map (JSON or file) so a community can make and share maps.
+
+**Feasibility:** Yes, in stages. The editor already round-trips map JSON through a text box; this makes it real file sharing.
+
+- **Near term (files):** export the current map as a downloaded `.tkmap` file (JSON now; a zip bundle later, per plan Section 8.4) and import one via a file picker, in both the editor and the game. This lets people email or post maps and load them into their library.
+- **Untrusted input:** imported maps are untrusted. Apply the import-safety rules already specified (plan Section 10.5 and FR-4 notes): validate against the frozen schema before use, cap size, and reject anything malformed. Bundled images (from the sprite path) need the same size and type checks.
+- **Community sharing (later):** a shared online map repository (browse, upload, download, rate) is a server feature. It fits the optional Cloudflare layout (plan Section 12): a Worker API plus R2 for map bundles. Keep it opt-in and off the offline-first critical path.
+
+**Status:** the in-editor JSON text export/import exists today; the persistent per-origin **map library** (editor to game) also exists ([`../../packages/storage`]). What is missing for real sharing is file download/upload and, later, the online repository.
+
+**Lands in:** editor + game (file import/export, schema-validated); optional sync worker (community repository).
+
 ## Cross-references
 
 - Research refinements (head-of-research confirmation dialog, on-device model options) are in [`dynamic-research.md`](dynamic-research.md).

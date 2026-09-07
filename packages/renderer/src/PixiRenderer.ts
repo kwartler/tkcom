@@ -153,7 +153,25 @@ export class PixiRenderer implements RendererPort {
       this.drawCell(c, cell, map.dimensions);
     }
 
+    this.drawZones(map);
     this.applyCamera();
+  }
+
+  /** Tint the cells of each zone by kind, so spawn/objective areas are visible. */
+  private drawZones(map: MapFile): void {
+    const w = this.metrics.tileW;
+    const h = this.metrics.tileH;
+    for (const zone of map.zones) {
+      const color = zoneColor(zone.kind);
+      for (const pos of zone.cells) {
+        const container = this.levelContainers.get(pos.z);
+        if (!container) continue;
+        const p = project(pos, { panX: 0, panY: 0, zoom: 1 }, this.metrics);
+        const g = new Graphics();
+        g.poly([p.sx, p.sy - h, p.sx + w, p.sy, p.sx, p.sy + h, p.sx - w, p.sy]).fill(color, 0.35);
+        container.addChild(g);
+      }
+    }
   }
 
   /**
@@ -431,4 +449,19 @@ function factionColor(faction: string): number {
   let hash = 0;
   for (const char of faction) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
   return 0x404040 | (hash & 0xbfbfbf);
+}
+
+function zoneColor(kind: string): number {
+  switch (kind) {
+    case "player-spawn":
+      return 0x3d7bff;
+    case "enemy-spawn":
+      return 0xff5040;
+    case "objective":
+      return 0xffd54f;
+    case "extraction":
+      return 0x40c0a0;
+    default:
+      return 0xaaaaaa;
+  }
 }
