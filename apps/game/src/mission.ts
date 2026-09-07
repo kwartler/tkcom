@@ -97,9 +97,21 @@ export function deployMission(
     cells = walkableCells(map);
   }
 
+  // Prefer authored spawn zones; fall back to the ends of the walkable list.
+  const key = (p: GridPosition): string => `${p.x},${p.y},${p.z}`;
+  const walkableSet = new Set(cells.map(key));
+  const zoneCells = (kind: string): GridPosition[] =>
+    (map.zones.find((z) => z.kind === kind)?.cells ?? []).filter((c) => walkableSet.has(key(c)));
+
+  let playerCells = zoneCells("player-spawn");
+  let enemyCells = zoneCells("enemy-spawn");
+  if (playerCells.length < squad.length || enemyCells.length < enemyCount) {
+    playerCells = cells.slice(0, squad.length);
+    enemyCells = cells.slice(-enemyCount).reverse();
+  }
+
   const fallback: GridPosition = { x: 0, y: 0, z: 0 };
-  const players: Unit[] = squad.map((op, i) => player(op, cells[i] ?? fallback));
-  const enemyCells = cells.slice(-enemyCount).reverse();
+  const players: Unit[] = squad.map((op, i) => player(op, playerCells[i] ?? fallback));
   const enemies: Unit[] = Array.from({ length: enemyCount }, (_v, i) =>
     enemy(i, enemyCells[i] ?? fallback),
   );
