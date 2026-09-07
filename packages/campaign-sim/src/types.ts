@@ -52,6 +52,12 @@ export interface ResearchProject {
   };
 }
 
+/** A hireable recruit waiting in the pool. */
+export interface RecruitCandidate {
+  readonly id: string;
+  readonly name: string;
+}
+
 export type ScheduledKind =
   | "ResearchCompleted"
   | "OperativeRecovered"
@@ -79,6 +85,10 @@ export interface CampaignState {
   readonly engineers: number;
   readonly facilities: FacilityCounts;
   readonly roster: readonly Operative[];
+  /** Recruits available to hire; refills over time. */
+  readonly recruits: readonly RecruitCandidate[];
+  /** Monotonic counter for minting operative ids (recruits). */
+  readonly nextOperativeSeq: number;
   readonly research: readonly ResearchProject[];
   readonly queue: readonly ScheduledEvent[];
   readonly nextSeq: number;

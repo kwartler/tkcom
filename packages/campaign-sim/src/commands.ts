@@ -18,6 +18,23 @@ export const SICKBAY_RECOVERY_FACTOR = 0.6;
 export const PER_SCIENTIST_RATE = 1; // scientist-days of progress per day
 export const HIRE_COST = 150; // one-time, per scientist or engineer
 
+export const RECRUIT_COST = 200; // one-time, per soldier
+export const TRANSFER_DAYS = 2; // recruit travel time before active
+export const RECRUIT_POOL_CAP = 4; // max recruits waiting to hire
+export const RECRUIT_REFILL = 2; // added to the pool each monthly tick
+export const RECRUIT_NAMES = [
+  "Ash",
+  "Bex",
+  "Cyra",
+  "Dane",
+  "Enzo",
+  "Fenn",
+  "Gale",
+  "Hollis",
+  "Iris",
+  "Jax",
+] as const;
+
 /** Monthly salaries (settled at each MonthlyTick). */
 export const SCIENTIST_SALARY = 300;
 export const ENGINEER_SALARY = 300;
@@ -88,6 +105,11 @@ export interface RenameOperativeCommand extends BaseCommand {
   readonly name: string;
 }
 
+export interface RecruitOperativeCommand extends BaseCommand {
+  readonly type: "RecruitOperative";
+  readonly candidateId: string;
+}
+
 export interface ResolveMissionCommand extends BaseCommand {
   readonly type: "ResolveMission";
   readonly outcome: MissionOutcome;
@@ -102,6 +124,7 @@ export type CampaignCommand =
   | BuildFacilityCommand
   | HirePersonnelCommand
   | RenameOperativeCommand
+  | RecruitOperativeCommand
   | ResolveMissionCommand;
 
 // -- events --
@@ -152,6 +175,12 @@ export interface OperativeRenamedEvent extends BaseEvent {
   readonly operativeId: string;
   readonly name: string;
 }
+export interface OperativeRecruitedEvent extends BaseEvent {
+  readonly type: "OperativeRecruited";
+  readonly operativeId: string;
+  readonly name: string;
+  readonly arrivesAt: number;
+}
 export interface MissionResolvedEvent extends BaseEvent {
   readonly type: "MissionResolved";
   readonly missionId: string;
@@ -186,6 +215,7 @@ export type CampaignEvent =
   | OperativeWoundedEvent
   | OperativeKilledEvent
   | OperativeRenamedEvent
+  | OperativeRecruitedEvent
   | MissionResolvedEvent
   | MonthlyReportEvent
   | CampaignEndedEvent

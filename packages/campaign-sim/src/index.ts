@@ -15,6 +15,7 @@ export type {
   Operative,
   FacilityType,
   FacilityCounts,
+  RecruitCandidate,
   ResearchProject,
   ScheduledKind,
   ScheduledEvent,
@@ -41,6 +42,7 @@ export type {
   BuildFacilityCommand,
   HirePersonnelCommand,
   RenameOperativeCommand,
+  RecruitOperativeCommand,
   ResolveMissionCommand,
   CampaignEvent,
   MissionOutcome,
@@ -51,6 +53,7 @@ export {
   MISSION_REWARD_CREDITS,
   SALVAGE_PER_ENEMY,
   HIRE_COST,
+  RECRUIT_COST,
   FACILITY_DEFS,
 } from "./commands.js";
 
