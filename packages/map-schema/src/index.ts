@@ -63,12 +63,27 @@ export const ZoneSchema = z.object({
   cells: z.array(GridPositionSchema).min(1),
 });
 
-/** The map body. */
+/** Largest allowed data-URI length for one custom tile image (~2 MB binary as
+ * base64). Keeps a single map's embedded art bounded; a zip .tkmap bundle is the
+ * longer-term home for the bytes. */
+export const CUSTOM_TILE_IMAGE_MAX = 3_000_000;
+
+/** A player-authored terrain: a namespaced id, a display name, and an embedded
+ * image (a `data:image/...` URI). Only ever drawn as a texture, never executed. */
+export const CustomTileSchema = z.object({
+  id: IdSchema,
+  name: z.string().min(1).max(60),
+  image: z.string().startsWith("data:image/").max(CUSTOM_TILE_IMAGE_MAX),
+});
+
+/** The map body. `tilePalette` is optional and additive, so every existing v1
+ * map stays valid without it. */
 export const MapFileSchema = z.object({
   schemaVersion: z.literal(MAP_SCHEMA_VERSION),
   dimensions: DimensionsSchema,
   cells: z.array(CellSchema),
   zones: z.array(ZoneSchema).default([]),
+  tilePalette: z.array(CustomTileSchema).max(64).optional(),
 });
 
 /** The manifest that travels with a .tkmap bundle. */
@@ -88,6 +103,7 @@ export const MapManifestSchema = z.object({
 export type GridPosition = z.infer<typeof GridPositionSchema>;
 export type Dimensions = z.infer<typeof DimensionsSchema>;
 export type Cell = z.infer<typeof CellSchema>;
+export type CustomTile = z.infer<typeof CustomTileSchema>;
 export type Zone = z.infer<typeof ZoneSchema>;
 export type MapFile = z.infer<typeof MapFileSchema>;
 export type MapManifest = z.infer<typeof MapManifestSchema>;

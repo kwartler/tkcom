@@ -305,3 +305,45 @@ describe("MapFile shape compatibility", () => {
     expect(ed.doc.cells.get("0,0,0")?.walls?.[0]?.edge).toBe("north");
   });
 });
+
+describe("custom terrain palette (FR-7)", () => {
+  const tile = {
+    id: "user.tile.grass",
+    name: "Grass",
+    image: "data:image/png;base64,AAAA",
+  };
+
+  it("round-trips a tile palette through the MapFile", () => {
+    const ed = new MapEditor(buildFloorMap({ width: 2, height: 2, levels: 1 }));
+    ed.setTilePalette([tile]);
+    expect(ed.tilePalette).toEqual([tile]);
+    const out = ed.toMapFile();
+    expect(out.tilePalette).toEqual([tile]);
+    // Reloading the exported file restores the palette.
+    const reloaded = new MapEditor(out);
+    expect(reloaded.tilePalette).toEqual([tile]);
+  });
+
+  it("keeps the palette through painting, zones, and rotation", () => {
+    const ed = new MapEditor(buildFloorMap({ width: 3, height: 2, levels: 1 }));
+    ed.setTilePalette([tile]);
+    ed.setFloor({ x: 0, y: 0, z: 0 }, tile.id);
+    ed.addZone({ id: "z", kind: "player-spawn", cells: [{ x: 0, y: 0, z: 0 }] });
+    ed.rotate();
+    expect(ed.tilePalette).toEqual([tile]);
+    expect(ed.toMapFile().tilePalette).toEqual([tile]);
+  });
+
+  it("undoes a palette change", () => {
+    const ed = new MapEditor(buildFloorMap({ width: 2, height: 2, levels: 1 }));
+    ed.setTilePalette([tile]);
+    ed.undo();
+    expect(ed.tilePalette).toEqual([]);
+  });
+
+  it("defaults to an empty palette when the map has none", () => {
+    const ed = new MapEditor(buildFloorMap({ width: 2, height: 2, levels: 1 }));
+    expect(ed.tilePalette).toEqual([]);
+    expect(ed.toMapFile().tilePalette).toBeUndefined();
+  });
+});
