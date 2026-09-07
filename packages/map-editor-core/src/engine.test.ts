@@ -287,4 +287,21 @@ describe("MapFile shape compatibility", () => {
     ed.setFloor({ x: 1, y: 0, z: 0 }, "core.tile.metal");
     expect(ed.doc.zones[0]?.cells).toEqual([{ x: 0, y: 0, z: 0 }]);
   });
+
+  it("rotates the map 90 degrees clockwise (cells, walls, zones), undoably", () => {
+    const ed = new MapEditor(buildFloorMap({ width: 3, height: 2, levels: 1 }));
+    ed.toggleWall({ x: 0, y: 0, z: 0 }, "north", "core.obj.wall");
+    ed.addZone({ id: "z", kind: "player-spawn", cells: [{ x: 2, y: 1, z: 0 }] });
+
+    ed.rotate();
+    expect(ed.doc.dimensions).toMatchObject({ width: 2, height: 3, levels: 1 });
+    // (0,0) -> (height-1-0, 0) = (1,0); its north wall becomes east
+    expect(ed.doc.cells.get("1,0,0")?.walls?.[0]?.edge).toBe("east");
+    // zone cell (2,1) -> (height-1-1, 2) = (0,2)
+    expect(ed.doc.zones[0]?.cells[0]).toEqual({ x: 0, y: 2, z: 0 });
+
+    ed.undo();
+    expect(ed.doc.dimensions).toMatchObject({ width: 3, height: 2 });
+    expect(ed.doc.cells.get("0,0,0")?.walls?.[0]?.edge).toBe("north");
+  });
 });

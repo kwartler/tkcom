@@ -18,6 +18,7 @@ export {
   moveObject,
   paintFloor,
   paintWall,
+  rotateDocumentCW,
 } from "./engine";
 export type {
   Cell,
