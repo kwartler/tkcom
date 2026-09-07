@@ -1,0 +1,14 @@
+{
+  "name": "@tkcom/atlas-pack",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Authoring tool: pack tile images into an atlas plus a PixiJS JSON frame map",
+  "type": "module",
+  "bin": { "atlas-pack": "./pack.mjs" },
+  "scripts": {
+    "pack": "node pack.mjs"
+  },
+  "dependencies": {
+    "sharp": "^0.33.5"
+  }
+}

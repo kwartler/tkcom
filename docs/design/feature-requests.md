@@ -19,6 +19,15 @@
 - Uploaded images are untrusted input: enforce type and size limits; they are only ever drawn as a texture, never executed.
 - Depends on the renderer sprite path (the same work the real-art pipeline needs). Ties to Lane D graphics.
 
+**A user-created tile needs no JSON.** A single uploaded image binds directly to a
+tile id (`setSprites({ tiles: { id } })`), which the editor already does. The JSON
+**frame map** exists only when many sprites are packed into one atlas image; that is
+an internal build optimisation for our shipped art (see
+[`../graphics/nano-banana-tiles.md`](../graphics/nano-banana-tiles.md) and
+[`../../tools/atlas-pack`](../../tools/atlas-pack)), and the app generates it, never
+the user. So this FR is exactly "the user creates a tile," and it stays a
+one-image-per-tile experience with no frame-map authoring on the player's side.
+
 **Lands in:** Lane B (renderer sprite path + editor UI), enabled by Lane D art pipeline.
 
 ---
