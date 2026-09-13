@@ -1283,3 +1283,33 @@ To keep this future open without building it yet:
 - Keep the command/event model and replay log expressive enough to carry an externally sourced command with its recorded result.
 - Keep callout-style effects (shared knowledge, readiness bias) representable in the battle state even if only scripted triggers use them at first.
 - Keep the adversary persona's influence expressed as ordinary validated commands, so the deterministic AI and a future LLM use the same path.
+
+## 22. Deferred action: OpenXcom gameplay gap analysis
+
+**Status:** Recorded, not yet started. Do this when post-alpha planning begins,
+not before.
+
+Do a detailed review of OpenXcom (<https://github.com/OpenXcom/OpenXcom>) and map
+**all** of its gameplay to this plan, recording every gap. Scope is the whole game,
+not one layer: battlescape (movement, facing, stance, time units, fire modes,
+reactions, inventory, throwing, explosives, morale/panic, psi, terrain
+destruction, day/night and lighting, fog of war), geoscape (world map, funding
+council of nations, detection/radar, UFO activity, interception and craft/air
+combat, mission windows and types such as terror and base defense), basescape
+(multiple bases, facilities, manufacturing, stores, containment, transfers),
+research and ufopaedia (branching research, capture-driven unlocks, autopsy and
+interrogation), the economy (marketplace buy/sell, upkeep), and the save, mod, and
+content model.
+
+- **Output:** a gap list (OpenXcom system -> our status -> where it lands in this
+  plan or a new section/FR), so nothing is missed and each gap has an owner.
+- **Ground truth for "our status":** [`STATUS.md`](STATUS.md), the living
+  implementation-status tracker; update it as part of this review.
+- **Boundary:** this is a structural/functional study only. Per Section 2, TKCom
+  ships original content and must not copy X-COM's data, art, names, or fiction.
+
+## Implementation status
+
+The current build state of every major system is tracked in
+[`STATUS.md`](STATUS.md) (Built / Partial / Not started), kept current as work
+ships. This plan states intent; `STATUS.md` states what exists.
