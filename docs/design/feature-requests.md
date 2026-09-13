@@ -355,6 +355,29 @@ autosave, map library); this FR adds a settings surface plus a small
 persistence), and Lane C (selection wired to the config). The cache controls reuse
 what storage already provides.
 
+## AI features: providers and fallbacks
+
+The AI features form one system with a single rule: **degrade gracefully.** Each
+has a hosted path (best quality, needs the player's OpenRouter key), an on-device
+path where the browser supports it (no key), and a deterministic fallback that
+always works with no key and no network. FR-11 settings pick among them, and the
+Lane C selection order is always hosted, then on-device, then the always-on
+fallback. Generation always happens **once at the input boundary** and is stored
+as data, so determinism, replay, and offline play never depend on any model.
+
+| Feature | Hosted (OpenRouter key) | On-device (no key) | Always-on fallback | FR / doc |
+| --- | --- | --- | --- | --- |
+| Research plan (head of research) | Hosted LLM (Claude via the sync worker) | WebLLM on WebGPU; opportunistically Chrome's Gemini Nano | Deterministic template generator (category + keywords) | FR-9, [`dynamic-research.md`](dynamic-research.md) |
+| Item / equipment art | OpenRouter text-to-image from the item's clamped description | (none; use a fallback) | Hand-drawn pixel-art maker, or a procedural placeholder icon | FR-8, FR-10, [`../graphics/equipment-sprites.md`](../graphics/equipment-sprites.md) |
+| Terrain / tile art | OpenRouter text-to-image (authoring pipeline) | (none; use a fallback) | Upload your own image, or the pixel-art maker; else placeholder primitives | FR-1, FR-7, FR-10, [`../graphics/nano-banana-tiles.md`](../graphics/nano-banana-tiles.md) |
+| Provider selection + secrets | OpenRouter key (stored locally; sync-worker proxy recommended) | On-device toggles (WebLLM, pixel-art) | Runs with nothing configured (template plans + procedural / hand-drawn art) | FR-11 |
+
+Notes:
+- The **key never gates the game.** With nothing configured, the campaign runs on
+  template research plans and procedural or hand-drawn art.
+- The player always enters their own key; it is stored per-origin and only ever
+  sent to OpenRouter over HTTPS or the project's own proxy.
+
 ## Cross-references
 
 - Research refinements (head-of-research confirmation dialog, on-device model options) are in [`dynamic-research.md`](dynamic-research.md); FR-8 is its visual half (item art), FR-9 its no-key on-device path.
