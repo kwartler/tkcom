@@ -248,9 +248,117 @@ present), content-schema (an optional stored-image field on item definitions,
 additive like FR-7's `tilePalette`), and the campaign save. Buildable after the
 fluid-research item model exists; the placeholder-icon slice is buildable earlier.
 
+## FR-9: On-device research head via WebLLM (no API key required)
+
+**Request:** some players will not have an LLM key. They should still get the
+"chat with your head of research" experience, powered by a small on-device model.
+
+**Feasibility:** Yes. This promotes an option already sketched in
+[`dynamic-research.md`](dynamic-research.md) (Section 5a) to a committed, no-key
+path: run a small quantized model in the browser with **MLC WebLLM** on WebGPU.
+
+**Approach:**
+- The research head sits behind the single Lane C adapter interface, so the
+  generator is swappable. Selection order: **hosted** (if the player added an
+  OpenRouter key, see FR-11), else **WebLLM on-device** (if WebGPU is available and
+  the player enabled it), else the **deterministic template generator** (always
+  available). All three feed the same validate-and-clamp step, so the downstream
+  `ResearchProject` is identical regardless of source.
+- WebLLM downloads a compact model once (roughly a few hundred MB) and caches it
+  (Cache API / IndexedDB) for fully offline use. Generation is **one-shot at
+  project initiation**, so latency is tolerable and determinism is unaffected: the
+  output is clamped and stored as data, and no model runs during the sim.
+
+**Caveats:**
+- Requires **WebGPU**; on browsers without it, fall back to the template
+  generator. Never block play on the model being present.
+- The first-run download is large, so it must be **opt-in** behind the settings
+  toggle (FR-11), with clear size and progress messaging; it is cached afterward.
+- Slower and lower quality than hosted, which is fine for a single advisory plan.
+
+**Lands in:** Lane C (the WebLLM adapter behind the existing selection interface)
+plus the settings toggle (FR-11). Buildable after the fluid-research data model
+and the template-generator path exist.
+
+## FR-10: Built-in pixel-art sprite maker for items (offline, no image model)
+
+**Request:** when OpenRouter (and thus the text-to-image model) is not available,
+let the user **hand-draw** a small, highly pixelated sprite for an item, retro
+16-bit-video-game style with a fixed, limited palette (like a deliberately basic
+MS Paint), and **save it associated with that item**.
+
+**Feasibility:** Yes, fully self-contained and offline: no network, no model.
+
+**Approach:**
+- A small **pixel canvas editor**: a fixed low-resolution grid (for example 16x16
+  or 32x32) shown zoomed with a visible pixel grid, and a **fixed limited palette**
+  (a retro set of a few to a few dozen colors) to enforce the 16-bit look. Tools:
+  pencil, eraser (transparent), flood fill, eyedropper, and clear.
+- **Save as data:** export the grid to a small PNG `data:image/...` URI and store
+  it on the item definition keyed by `ContentId`, exactly like FR-8's generated
+  art and FR-7's terrain. The renderer draws it through the existing sprite path
+  with nearest-neighbor scaling so the pixels stay crisp when enlarged.
+- Because it produces the same stored-image shape, this is the **manual fallback
+  for FR-8** (draw an item's icon when no model is reachable) and can also feed the
+  terrain palette (FR-7).
+
+**Caveats:**
+- Output is tiny by construction (bounded by the grid size and palette), so the
+  save stays small; still cap and type-check the produced data URI like any stored
+  image.
+- Purely local authoring; no untrusted external input, but the saved image is
+  still only ever drawn as a texture, never executed.
+
+**Lands in:** Lane B (the editor/game pixel UI), content-schema (the same optional
+stored-image field on items as FR-8), and the renderer (nearest-neighbor sprite
+draw). Buildable now as a standalone widget; wiring to items follows FR-8's item
+model.
+
+## FR-11: AI provider settings (on-device toggles or an OpenRouter key)
+
+**Request:** in settings, a user configures the LLM and text-to-image features:
+either **toggle on the on-device paths** (the WebLLM research head from FR-9, and
+the pixel-art maker / procedural fallback for art) **or add an OpenRouter key** to
+use hosted models (the research generator and the item sprites from FR-8). Also
+surface the existing save/load from cache here.
+
+**Feasibility:** Yes. Save/load from cache already exists in
+[`../../packages/storage`](../../packages/storage) (IndexedDB save repository,
+autosave, map library); this FR adds a settings surface plus a small
+**provider-config** store and wires the Lane C selection order to it.
+
+**Approach:**
+- A **Settings panel** with: an optional **OpenRouter API key** field; an **enable
+  on-device LLM (WebLLM)** toggle (FR-9); an **enable hosted text-to-image** toggle
+  (FR-8) that requires a key; and the existing **cache controls** (export / import
+  a save, clear cache) made visible.
+- **Selection logic** reads this config (matching `dynamic-research.md` Section
+  5a): a key present enables hosted generation; otherwise the on-device toggles
+  choose WebLLM / pixel-art; otherwise the deterministic fallbacks. Features never
+  hard-fail: with nothing configured, the game still runs on template plans and
+  procedural / hand-drawn art.
+- Persist the config **locally only** (IndexedDB via the storage package, or
+  `localStorage`); it is per-origin and never synced.
+
+**Caveats / safety:**
+- The API key is a **secret**. Store it locally only, mask the input, and provide
+  a clear/delete control. A key held in the client is visible to that browser
+  origin, so the **more secure option is the optional sync worker proxy** (plan
+  Section 12): the client calls the worker, the key lives server-side and never
+  ships in client requests. Offer the direct-key path with a plain warning, and
+  the proxy path as the recommended one.
+- Per the assistant's operating rules, the **player enters their own key**; it is
+  never requested or typed on their behalf, and it is only ever sent to OpenRouter
+  (over HTTPS) or the project's own proxy, never to any other service.
+
+**Lands in:** Lane B (settings UI), the storage package (provider-config
+persistence), and Lane C (selection wired to the config). The cache controls reuse
+what storage already provides.
+
 ## Cross-references
 
-- Research refinements (head-of-research confirmation dialog, on-device model options) are in [`dynamic-research.md`](dynamic-research.md); FR-8 is its visual half (item art).
+- Research refinements (head-of-research confirmation dialog, on-device model options) are in [`dynamic-research.md`](dynamic-research.md); FR-8 is its visual half (item art), FR-9 its no-key on-device path.
+- FR-9 (on-device research head), FR-10 (offline pixel-art item maker), and FR-11 (provider settings) together make the AI features degrade gracefully with no key and no network.
 - Text-to-image model options and the item-sprite workflow are in [`../graphics/nano-banana-tiles.md`](../graphics/nano-banana-tiles.md) and [`../graphics/equipment-sprites.md`](../graphics/equipment-sprites.md).
 - Base, personnel, and economy context for FR-2 and FR-3 is in [`base-and-campaign.md`](base-and-campaign.md).
 - Art pipeline context for FR-1 is Lane D in [`../WORK_SPLIT.md`](../WORK_SPLIT.md).
