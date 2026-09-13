@@ -1,4 +1,4 @@
-# Tile art with a text-to-image model (nano-banana / Gemini 2.5 Flash Image)
+# Tile art with a text-to-image model (nano-banana / Gemini Flash Image)
 
 How to generate TKCom isometric tile sprites with an OpenRouter text-to-image
 model, keep them consistent across a whole set, and get them into the renderer.
@@ -9,19 +9,25 @@ turns a folder of them into an atlas plus a JSON frame map.
 
 ## Model
 
-Use **Google Gemini 2.5 Flash Image** ("nano-banana") on OpenRouter:
-`google/gemini-2.5-flash-image`.
+Use a **"nano-banana" Gemini Flash Image** model on OpenRouter. As of September
+2026 the current one is **Nano Banana 2 (Gemini 3.1 Flash Image)**,
+`google/gemini-3.1-flash-image`; the older `google/gemini-2.5-flash-image` still
+works as a cheaper fallback.
 
-Why this one for tiles: the hard part is not the quality of any single image, it
-is holding one style (camera angle, light direction, palette) across dozens of
-tiles. This model takes **reference images**, so you draw one hero tile and then
-feed it back as a style anchor for every other tile. It is also cheap and fast
-enough to iterate a full set.
+Why this family for tiles: the hard part is not the quality of any single image,
+it is holding one style (camera angle, light direction, palette) across dozens of
+tiles. These models take **reference images** and are built for character/style
+consistency, so you draw one hero tile and feed it back as a style anchor for
+every other tile. They are cheap and fast enough to iterate a full set.
 
-Alternatives: OpenAI `gpt-image-1` (great prompt adherence, weaker at holding an
-exact style across a batch) or an open-weights FLUX.1 variant. OpenRouter's
-image roster shifts, so filter their models page to "image output" and confirm
-the id before scripting against it.
+Alternatives worth testing: **Seedream 4.5** (`bytedance-seed/seedream-4.5`,
+strong editing consistency), **FLUX.2 Pro** (`black-forest-labs/flux.2-pro`,
+strong prompt adherence and style consistency), OpenAI **GPT Image 2**
+(`openai/gpt-image-2`), and **Recraft** if you want an icon/vector-oriented model
+for equipment art (see [`equipment-sprites.md`](equipment-sprites.md)).
+OpenRouter's unified Image API exposes 30+ models and the roster shifts, so
+filter the models page to image output and confirm the slug before scripting
+against it.
 
 Two things no diffusion model does reliably, so the workflow plans for them:
 
