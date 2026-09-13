@@ -168,8 +168,89 @@ open). Best built alongside or just after FR-6 file import/export, since both sh
 the "images travel with the map" bundling. Buildable now as an editor-plus-schema
 slice; the persistent bundle format can follow.
 
+## FR-8: Generate an equipment sprite from a researched item's description
+
+**Request:** the "chat with your head of research" flow lets a player describe an
+item in plain language ("create a laser to fight aliens"); that becomes a real
+entry in the research portfolio and, on completion, an in-game item. For the item
+to be usable gear it needs a **graphic**. So: take the finished, researched item's
+description and **generate and save a sprite/icon for it** using a text-to-image
+model, so equipment has art in the inventory and on the battlefield.
+
+**Feasibility:** Yes. This is the visual half of the fluid-research feature
+([`dynamic-research.md`](dynamic-research.md)): research already yields a
+structured, clamped item definition (name, category, stats, description); FR-8
+turns that definition into a stored image. It reuses the OpenRouter text-to-image
+path ([`../graphics/nano-banana-tiles.md`](../graphics/nano-banana-tiles.md),
+[`../graphics/equipment-sprites.md`](../graphics/equipment-sprites.md)), the
+image-postprocess tool ([`../../tools/atlas-pack`](../../tools/atlas-pack)), and
+the renderer sprite path plus the stored-image-with-content pattern proven by FR-7.
+
+**Approach:**
+- **Trigger, once, at the input boundary (Lane C).** When a research wave
+  completes and produces an item, call the image model **one time** to render its
+  sprite, exactly as the research LLM is called once per plan. The result is
+  written into the campaign save / content pack as **data** (a `data:image/...`
+  URI or an asset id), keyed to the item's `ContentId`. No model call ever happens
+  during the deterministic simulation.
+- **Determinism is unaffected.** The sprite is cosmetic, never sim state, so
+  replay-to-identical-hash and offline play are untouched. Two campaigns with the
+  same seed still hash identically whether or not art was generated.
+- **Prompt is derived from the clamped item, not raw player text.** Build the
+  image prompt from the **validated** item definition (name, category, key stats,
+  a short sanitized description) under a fixed system contract, so the player's
+  original free text cannot steer the image model directly (same untrusted-input
+  rule as the research persona; see `dynamic-research.md` Section 5 and plan
+  Section 21.3). The category picks a consistent visual style.
+- **Two display surfaces, same stored image.** An **inventory / equipment icon**
+  (an HTML image in the campaign UI) and, when the item is dropped or shown on the
+  grid, an **object sprite** bound through the existing renderer sprite path
+  (`setSprites({ objects: { [id]: image } })`). Item art on a transparent
+  background suits an icon; reuse the packer's chroma-key + downscale step to
+  produce a clean, correctly sized sprite.
+- **Cache by item signature.** Key the generated sprite by a hash of the item's
+  identity (name + stats), so the same item reuses its art and a given campaign
+  regenerates nothing it already has.
+
+**Model:** the same OpenRouter Image API as the tile pipeline. For equipment icons
+prefer a model that does clean single-object art with transparency or an
+icon/vector style (for example Recraft, or a "nano-banana" Gemini Flash Image
+model with the magenta-key postprocess). Style consistency across an item set
+comes from a shared system prompt plus a reference image, documented in
+[`../graphics/equipment-sprites.md`](../graphics/equipment-sprites.md).
+
+**Caveats / safety:**
+- Generated images are **untrusted output**: validate type, byte size, and pixel
+  dimensions and only ever draw them as a texture (same rules as FR-7 / FR-6).
+- The item **description and stats are authoritative**; the sprite is decoration.
+  A missing or failed image must never block using the item.
+- **Offline / no-model fallback (always available):** when no image model is
+  reachable, fall back to a deterministic **procedural placeholder icon** (for
+  example a category-colored glyph or a primitive from the renderer), so every
+  researched item is always usable and shows *something*. This mirrors the
+  research feature's template-generator fallback and keeps the game offline-first.
+- Data URIs inflate the save; cap per-item image size and count, prefer WebP, and
+  move the bytes into a content-pack bundle later (the FR-6 bundling concern).
+
+**Phasing:**
+1. **Prereq:** the fluid-research item pipeline (`dynamic-research.md`) so items
+   carry a clamped definition and description.
+2. Ship the **procedural placeholder icon** first (no model): proves the
+   item-to-icon plumbing and the inventory/equipment display surface end to end,
+   fully offline.
+3. Swap in the **text-to-image generator** behind the same Lane C adapter, storing
+   its output as data, once the placeholder path is solid. Same interface, so
+   downstream display is identical whether art is generated or procedural.
+
+**Lands in:** Lane C (the generate-once adapter, alongside the research generator),
+Lane B (inventory/equipment icon UI + the renderer object-sprite binding, already
+present), content-schema (an optional stored-image field on item definitions,
+additive like FR-7's `tilePalette`), and the campaign save. Buildable after the
+fluid-research item model exists; the placeholder-icon slice is buildable earlier.
+
 ## Cross-references
 
-- Research refinements (head-of-research confirmation dialog, on-device model options) are in [`dynamic-research.md`](dynamic-research.md).
+- Research refinements (head-of-research confirmation dialog, on-device model options) are in [`dynamic-research.md`](dynamic-research.md); FR-8 is its visual half (item art).
+- Text-to-image model options and the item-sprite workflow are in [`../graphics/nano-banana-tiles.md`](../graphics/nano-banana-tiles.md) and [`../graphics/equipment-sprites.md`](../graphics/equipment-sprites.md).
 - Base, personnel, and economy context for FR-2 and FR-3 is in [`base-and-campaign.md`](base-and-campaign.md).
 - Art pipeline context for FR-1 is Lane D in [`../WORK_SPLIT.md`](../WORK_SPLIT.md).
